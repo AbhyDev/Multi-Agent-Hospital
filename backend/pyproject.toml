@@ -1,0 +1,23 @@
+[project]
+name = "backend"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.117.1",
+    "gtts>=2.5.4",
+    "langchain>=0.3.27",
+    "langchain-chroma>=0.2.6",
+    "langchain-google-genai>=2.1.12",
+    "langchain-groq>=0.3.8",
+    "langchain-huggingface>=0.3.1",
+    "langchain-tavily>=0.2.11",
+    "langgraph>=0.6.7",
+    "pygame>=2.6.1",
+    "python-dotenv>=1.1.1",
+    "sentence-transformers>=5.1.1",
+    "speechrecognition>=3.14.3",
+    "sse-starlette>=3.0.2",
+    "uvicorn>=0.37.0",
+]

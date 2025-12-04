@@ -1,0 +1,80 @@
+# Python (backend)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.git
+.mypy_cache
+.pytest_cache
+.hypothesis
+
+
+# Environment files
+# .env
+
+# Project-specific ignores
+backend/custom_libs/
+backend/OS_downloads.txt
+
+# Node.js (frontend)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+dist/
+build/
+.next/
+.nuxt/
+.vite/
+
+# Environment variables
+# Keep ALL environment files ignored to prevent accidentally committing secrets
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Vector stores (large files, regenerate as needed)
+backend/vector_stores/
+backend/Knowledge Base
+
+# Logs
+logs/
+*.log
+
+# Temporary files
+*.tmp
+*.temp
