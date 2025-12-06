@@ -37,6 +37,7 @@ type ToolEventData = {
 
 const BACKEND = import.meta.env.VITE_API_BASE || '' // use proxy when ''
 const LOGIN_URL = 'http://localhost:8000/login'
+const TOKEN_STORAGE_KEY = 'access_token'
 
 export default function App() {
   const [threadId, setThreadId] = useState<string | null>(null)
@@ -44,7 +45,7 @@ export default function App() {
   const [pendingAsk, setPendingAsk] = useState<AskEvent | null>(null)
   const [currentAgent, setCurrentAgent] = useState<string>('GP')
   const [tools, setTools] = useState<ToolEventData[]>([])
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem('token'))
+  const [token, setToken] = useState<string | null>(() => localStorage.getItem(TOKEN_STORAGE_KEY))
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [authError, setAuthError] = useState<string | null>(null)
@@ -105,7 +106,7 @@ export default function App() {
       if (!data?.access_token) {
         throw new Error('Login response missing access_token')
       }
-      localStorage.setItem('token', data.access_token)
+      localStorage.setItem(TOKEN_STORAGE_KEY, data.access_token)
       setToken(data.access_token)
       setEmail('')
       setPassword('')
@@ -117,12 +118,12 @@ export default function App() {
   }, [email, password])
 
   const handleLogout = useCallback(() => {
-    localStorage.removeItem('token')
+    localStorage.removeItem(TOKEN_STORAGE_KEY)
     setToken(null)
   }, [])
 
   const startStream = useCallback((userText: string) => {
-    const activeToken = token || localStorage.getItem('token')
+    const activeToken = token || localStorage.getItem(TOKEN_STORAGE_KEY)
     if (!activeToken) {
       setAuthError('Please log in to start a consultation.')
       return
@@ -179,7 +180,7 @@ export default function App() {
   }, [token])
 
   const resumeStream = useCallback((tid: string, reply: string) => {
-    const activeToken = token || localStorage.getItem('token')
+    const activeToken = token || localStorage.getItem(TOKEN_STORAGE_KEY)
     if (!activeToken) {
       setAuthError('Session expired. Please log in again.')
       return
@@ -235,7 +236,7 @@ export default function App() {
     e.preventDefault()
     const val = inputRef.current?.value?.trim()
     if (!val) return
-    if (!(token || localStorage.getItem('token'))) {
+    if (!(token || localStorage.getItem(TOKEN_STORAGE_KEY))) {
       setAuthError('Please log in before chatting.')
       return
     }
