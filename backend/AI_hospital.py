@@ -47,7 +47,7 @@ from tenacity import wait_exponential # <-- Import this
 load_dotenv()
 
 llm = ChatGoogleGenerativeAI(
-    model="gemini-2.0-flash", # Using 1.5-flash as it's a common, recent model
+    model="gemini-2.5-flash", # Using 1.5-flash as it's a common, recent model
     google_api_key=os.getenv("GEMINI_API_KEY"),
 )
 
@@ -219,11 +219,10 @@ def Patient_data_report(data: str, state: Annotated[dict, InjectedState]) -> str
             db.add(new_consult)
             db.commit()
             db.refresh(new_consult)
-            
-            return f"Patient Data compiled. Consultation #{new_consult.consultation_id} Started."
-            
+            print("Done")
     except Exception as e:
-        return f"Error saving to DB: {str(e)}"
+        print(f"Error saving to DB: {str(e)}")
+    return f"Patient Data compiled. Consultation #{new_consult.consultation_id} Started."
 @tool
 def VectorRAG_Retrival(query:str, agent:str)->str:
     """Retrieve and synthesize information from a domain-specific vector store.
