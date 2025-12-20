@@ -37,6 +37,7 @@ type ToolEventData = {
 
 const BACKEND = import.meta.env.VITE_API_BASE || '' // use proxy when ''
 const LOGIN_URL = 'http://localhost:8000/login'
+const SIGNUP_URL = 'http://localhost:8000/users/'
 const TOKEN_STORAGE_KEY = 'access_token'
 
 export default function App() {
@@ -48,8 +49,12 @@ export default function App() {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem(TOKEN_STORAGE_KEY))
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [name, setName] = useState('')
+  const [age, setAge] = useState('')
+  const [gender, setGender] = useState('')
   const [authError, setAuthError] = useState<string | null>(null)
   const [authLoading, setAuthLoading] = useState(false)
+  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login')
   const inputRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const chatRef = useRef<HTMLDivElement>(null)
@@ -117,9 +122,70 @@ export default function App() {
     }
   }, [email, password])
 
+  const handleSignup = useCallback(async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    if (!name.trim() || !email.trim() || !password.trim() || !age.trim() || !gender.trim()) {
+      setAuthError('All fields are required.')
+      return
+    }
+    const ageNum = parseInt(age, 10)
+    if (isNaN(ageNum) || ageNum < 0 || ageNum > 150) {
+      setAuthError('Please enter a valid age.')
+      return
+    }
+    setAuthLoading(true)
+    setAuthError(null)
+    try {
+      const response = await fetch(SIGNUP_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          name: name.trim(), 
+          email: email.trim(), 
+          password: password.trim(),
+          age: ageNum,
+          gender: gender.trim()
+        })
+      })
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.detail || 'Signup failed')
+      }
+      // Auto-login after successful signup
+      const loginResponse = await fetch(LOGIN_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ username: email.trim(), password: password.trim() }).toString()
+      })
+      if (!loginResponse.ok) {
+        throw new Error('Account created but login failed. Please try logging in.')
+      }
+      const data = await loginResponse.json()
+      if (!data?.access_token) {
+        throw new Error('Login response missing access_token')
+      }
+      localStorage.setItem(TOKEN_STORAGE_KEY, data.access_token)
+      setToken(data.access_token)
+      setName('')
+      setEmail('')
+      setPassword('')
+      setAge('')
+      setGender('')
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'Signup failed')
+    } finally {
+      setAuthLoading(false)
+    }
+  }, [name, email, password, age, gender])
+
   const handleLogout = useCallback(() => {
     localStorage.removeItem(TOKEN_STORAGE_KEY)
     setToken(null)
+    setThreadId(null)
+    setChat([])
+    setTools([])
+    setPendingAsk(null)
+    setCurrentAgent('GP')
   }, [])
 
   const startStream = useCallback((userText: string) => {
@@ -253,6 +319,109 @@ export default function App() {
   useEffect(() => { if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight }, [chat])
   useEffect(() => { if (toolListRef.current) toolListRef.current.scrollTop = toolListRef.current.scrollHeight }, [tools])
 
+  // If not authenticated, show the auth gate
+  if (!token) {
+    return (
+      <div className="app-root">
+        <div className="liquid-bg" />
+        <div className="cursor-glow" />
+        <div ref={containerRef} className="auth-gate glass tilt">
+          <div className="auth-gate-header">
+            <h1>🏥 AI Hospital</h1>
+            <p className="auth-gate-subtitle">Your AI-powered virtual medical consultation</p>
+          </div>
+          <div className="auth-tabs">
+            <button
+              className={`auth-tab ${authMode === 'login' ? 'active' : ''}`}
+              onClick={() => { setAuthMode('login'); setAuthError(null) }}
+            >
+              Login
+            </button>
+            <button
+              className={`auth-tab ${authMode === 'signup' ? 'active' : ''}`}
+              onClick={() => { setAuthMode('signup'); setAuthError(null) }}
+            >
+              Sign Up
+            </button>
+          </div>
+          {authMode === 'login' ? (
+            <form className="auth-gate-form" onSubmit={handleLogin}>
+              <input
+                type="email"
+                value={email}
+                placeholder="Email"
+                onChange={(e) => setEmail(e.target.value)}
+                className="auth-input"
+              />
+              <input
+                type="password"
+                value={password}
+                placeholder="Password"
+                onChange={(e) => setPassword(e.target.value)}
+                className="auth-input"
+              />
+              <button className="btn auth-btn" type="submit" disabled={authLoading}>
+                {authLoading ? 'Signing in…' : 'Login'}
+              </button>
+            </form>
+          ) : (
+            <form className="auth-gate-form" onSubmit={handleSignup}>
+              <input
+                type="text"
+                value={name}
+                placeholder="Full Name"
+                onChange={(e) => setName(e.target.value)}
+                className="auth-input"
+              />
+              <input
+                type="email"
+                value={email}
+                placeholder="Email"
+                onChange={(e) => setEmail(e.target.value)}
+                className="auth-input"
+              />
+              <input
+                type="password"
+                value={password}
+                placeholder="Password"
+                onChange={(e) => setPassword(e.target.value)}
+                className="auth-input"
+              />
+              <div className="auth-row">
+                <input
+                  type="number"
+                  value={age}
+                  placeholder="Age"
+                  onChange={(e) => setAge(e.target.value)}
+                  className="auth-input"
+                  min="0"
+                  max="150"
+                />
+                <select
+                  value={gender}
+                  onChange={(e) => setGender(e.target.value)}
+                  className="auth-input auth-select"
+                >
+                  <option value="">Gender</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <button className="btn auth-btn" type="submit" disabled={authLoading}>
+                {authLoading ? 'Creating account…' : 'Create Account'}
+              </button>
+            </form>
+          )}
+          {authError && <p className="auth-error">{authError}</p>}
+          <div className="auth-gate-footer">
+            <p>Secure • Private • AI-Powered Healthcare</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="app-root">
       <div className="liquid-bg" />
@@ -267,38 +436,19 @@ export default function App() {
               <span className="status-value">{currentAgent || '—'}</span>
             </div>
           </div>
-          <div className="badge">Live</div>
+          <div className="header-right">
+            <div className="badge">Live</div>
+            <button className="btn logout-btn" type="button" onClick={handleLogout}>Logout</button>
+          </div>
         </header>
-        <section className="auth-panel glass-inner">
-          {!token ? (
-            <form className="auth-form" onSubmit={handleLogin}>
-              <h2>Patient Login</h2>
-              <input
-                type="email"
-                value={email}
-                placeholder="Email"
-                onChange={(e) => setEmail(e.target.value)}
-              />
-              <input
-                type="password"
-                value={password}
-                placeholder="Password"
-                onChange={(e) => setPassword(e.target.value)}
-              />
-              <button className="btn" type="submit" disabled={authLoading}>
-                {authLoading ? 'Signing in…' : 'Login'}
-              </button>
-            </form>
-          ) : (
-            <div className="auth-status">
-              <span>Logged in</span>
-              <button className="btn" type="button" onClick={handleLogout}>Logout</button>
-            </div>
-          )}
-          {authError && <p className="auth-error">{authError}</p>}
-        </section>
         <div className="main-row">
           <main className="chat glass-inner" ref={chatRef}>
+            {chat.length === 0 && (
+              <div className="chat-welcome">
+                <h2>Welcome to AI Hospital 👋</h2>
+                <p>Describe your symptoms below to start a consultation with our AI General Physician.</p>
+              </div>
+            )}
             {chat.map((m: ChatItem, i: number) => (
               <div key={i} className={`bubble ${m.role === 'user' ? 'user' : 'assistant'}`}>
                 {m.role === 'assistant' && (

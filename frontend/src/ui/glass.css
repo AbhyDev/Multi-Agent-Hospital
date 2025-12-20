@@ -183,3 +183,183 @@ body { margin: 0; background: #0b1324; color: var(--text); font-family: ui-sans-
 @media (max-width: 640px) {
   .container { padding: 20px 14px; max-height: 92vh; }
 }
+
+/* Auth Gate Styles */
+.auth-gate {
+  position: relative;
+  z-index: 1;
+  width: min(440px, 90%);
+  margin: auto;
+  padding: 40px 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  text-align: center;
+}
+
+.auth-gate-header h1 {
+  margin: 0 0 8px 0;
+  font-size: 32px;
+  letter-spacing: 0.5px;
+}
+
+.auth-gate-subtitle {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.auth-tabs {
+  display: flex;
+  gap: 0;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 4px;
+}
+
+.auth-tab {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  padding: 12px 20px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.auth-tab:hover {
+  color: var(--text);
+}
+
+.auth-tab.active {
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: #0b1324;
+}
+
+.auth-gate-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.auth-input {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: var(--text);
+  padding: 14px 16px;
+  border-radius: 12px;
+  outline: none;
+  font-size: 15px;
+  transition: border-color 0.2s ease;
+}
+
+.auth-input:focus {
+  border-color: var(--accent);
+}
+
+.auth-input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.auth-row {
+  display: flex;
+  gap: 12px;
+}
+
+.auth-row .auth-input {
+  flex: 1;
+}
+
+.auth-select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23fff' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  padding-right: 36px;
+  cursor: pointer;
+}
+
+.auth-select option {
+  background: #1a2235;
+  color: var(--text);
+}
+
+.auth-btn {
+  margin-top: 8px;
+  padding: 14px 20px;
+  font-size: 15px;
+}
+
+.auth-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.auth-error {
+  color: var(--danger);
+  font-size: 13px;
+  margin: 0;
+  padding: 10px 14px;
+  background: rgba(255, 123, 158, 0.1);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 123, 158, 0.25);
+}
+
+.auth-gate-footer {
+  margin-top: 12px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.auth-gate-footer p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0.05em;
+}
+
+/* Header right section with logout */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logout-btn {
+  background: rgba(255, 123, 158, 0.2);
+  color: var(--danger);
+  padding: 8px 14px;
+  font-size: 13px;
+}
+
+.logout-btn:hover {
+  background: rgba(255, 123, 158, 0.3);
+  filter: none;
+}
+
+/* Chat welcome message */
+.chat-welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 40px 20px;
+  opacity: 0.8;
+}
+
+.chat-welcome h2 {
+  margin: 0 0 10px 0;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.chat-welcome p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  max-width: 320px;
+}

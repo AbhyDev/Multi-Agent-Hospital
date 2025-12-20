@@ -202,14 +202,14 @@ def Patient_data_report(data: str, state: Annotated[dict, InjectedState]) -> str
 
     try:
         with SessionLocal() as db:
-            # 2. Safety Check: Close any old "stuck" active sessions for this patient?
-            # (Optional, but good practice)
+            # 2. Safety Check: Close any old "stuck" active sessions for this patient
             existing = db.query(models.Consultation).filter(
                 models.Consultation.patient_id == current_patient_id,
                 models.Consultation.status == "Active"
             ).first()
             if existing:
-                existing.status = "Abandoned" # or reuse it
+                existing.status = "Abandoned"
+                db.commit()  # ← COMMIT THE ABANDONED STATUS
             
             # 3. Create NEW Consultation
             new_consult = models.Consultation(
@@ -219,10 +219,13 @@ def Patient_data_report(data: str, state: Annotated[dict, InjectedState]) -> str
             db.add(new_consult)
             db.commit()
             db.refresh(new_consult)
-            print("Done")
+            print(f"✅ DB: Created Consultation #{new_consult.consultation_id}")
+            return f"Patient Data compiled. Consultation #{new_consult.consultation_id} Started."
+            
     except Exception as e:
-        print(f"Error saving to DB: {str(e)}")
-    return f"Patient Data compiled. Consultation #{new_consult.consultation_id} Started."
+        error_msg = f"❌ DB Error in Patient_data_report: {str(e)}"
+        print(error_msg)
+        return f"Error: Failed to create consultation - {str(e)}"
 @tool
 def VectorRAG_Retrival(query:str, agent:str)->str:
     """Retrieve and synthesize information from a domain-specific vector store.
@@ -1175,17 +1178,17 @@ def router_radio(state: AgentState) -> AgentState:
     else:
         return "Radiologist"
 
-gp_tools = [Patient_data_report]
-opthal_tools = [search_internet, add_report, VectorRAG_Retrival]
-pedia_tools = [search_internet, add_report, VectorRAG_Retrival]
-ortho_tools = [search_internet, add_report, VectorRAG_Retrival]
-derma_tools = [search_internet, add_report, VectorRAG_Retrival]
-ent_tools = [search_internet, add_report, VectorRAG_Retrival]
-gynec_tools = [search_internet, add_report, VectorRAG_Retrival]
-psych_tools = [search_internet, add_report, VectorRAG_Retrival]
-med_tools = [search_internet, add_report, VectorRAG_Retrival]
-patho_tools = [search_internet, add_report, VectorRAG_Retrival]
-radio_tools = [search_internet, add_report]
+gp_tools = [ask_user, Patient_data_report]
+opthal_tools = [ask_user, search_internet, add_report, VectorRAG_Retrival]
+pedia_tools = [ask_user, search_internet, add_report, VectorRAG_Retrival]
+ortho_tools = [ask_user, search_internet, add_report, VectorRAG_Retrival]
+derma_tools = [ask_user, search_internet, add_report, VectorRAG_Retrival]
+ent_tools = [ask_user, search_internet, add_report, VectorRAG_Retrival]
+gynec_tools = [ask_user, search_internet, add_report, VectorRAG_Retrival]
+psych_tools = [ask_user, search_internet, add_report, VectorRAG_Retrival]
+med_tools = [ask_user, search_internet, add_report, VectorRAG_Retrival]
+patho_tools = [ask_user, search_internet, add_report, VectorRAG_Retrival]
+radio_tools = [ask_user, search_internet, add_report]
 
 
 opthal_tool_node = ToolNode(opthal_tools)
@@ -1243,7 +1246,11 @@ def opthal_tool_invoker(state: AgentState) -> dict:
     Takes tool calls from 'specialist_messages', runs them,
     and returns the output to be added back to 'specialist_messages'.
     """
-    tool_input = {'messages': [state['specialist_messages'][-1]]}
+    tool_input = {
+        'messages': [state['specialist_messages'][-1]],
+        'patient_id': state.get('patient_id'),
+        'consultation_id': state.get('consultation_id')
+    }
     tool_output_dict = opthal_tool_node.invoke(tool_input)
     tool_output_messages = tool_output_dict['messages']
     return {
@@ -1268,7 +1275,11 @@ def derma_tool_invoker(state: AgentState) -> dict:
     Takes tool calls from 'specialist_messages', runs them,
     and returns the output to be added back to 'specialist_messages'.
     """
-    tool_input = {'messages': [state['specialist_messages'][-1]]}
+    tool_input = {
+        'messages': [state['specialist_messages'][-1]],
+        'patient_id': state.get('patient_id'),
+        'consultation_id': state.get('consultation_id')
+    }
     tool_output_dict = derma_tool_node.invoke(tool_input)
     tool_output_messages = tool_output_dict['messages']
     return {
@@ -1293,7 +1304,11 @@ def pedia_tool_invoker(state: AgentState) -> dict:
     Takes tool calls from 'specialist_messages', runs them,
     and returns the output to be added back to 'specialist_messages'.
     """
-    tool_input = {'messages': [state['specialist_messages'][-1]]}
+    tool_input = {
+        'messages': [state['specialist_messages'][-1]],
+        'patient_id': state.get('patient_id'),
+        'consultation_id': state.get('consultation_id')
+    }
     tool_output_dict = pedia_tool_node.invoke(tool_input)
     tool_output_messages = tool_output_dict['messages']
     return {
@@ -1317,7 +1332,11 @@ def ortho_tool_invoker(state: AgentState) -> dict:
     Takes tool calls from 'specialist_messages', runs them,
     and returns the output to be added back to 'specialist_messages'.
     """
-    tool_input = {'messages': [state['specialist_messages'][-1]]}
+    tool_input = {
+        'messages': [state['specialist_messages'][-1]],
+        'patient_id': state.get('patient_id'),
+        'consultation_id': state.get('consultation_id')
+    }
     tool_output_dict = ortho_tool_node.invoke(tool_input)
     tool_output_messages = tool_output_dict['messages']
     return {
@@ -1341,7 +1360,11 @@ def ent_tool_invoker(state: AgentState) -> dict:
     Takes tool calls from 'specialist_messages', runs them,
     and returns the output to be added back to 'specialist_messages'.
     """
-    tool_input = {'messages': [state['specialist_messages'][-1]]}
+    tool_input = {
+        'messages': [state['specialist_messages'][-1]],
+        'patient_id': state.get('patient_id'),
+        'consultation_id': state.get('consultation_id')
+    }
     tool_output_dict = ent_tool_node.invoke(tool_input)
     tool_output_messages = tool_output_dict['messages']
     return {
@@ -1366,7 +1389,11 @@ def gynec_tool_invoker(state: AgentState) -> dict:
     Takes tool calls from 'specialist_messages', runs them,
     and returns the output to be added back to 'specialist_messages'.
     """
-    tool_input = {'messages': [state['specialist_messages'][-1]]}
+    tool_input = {
+        'messages': [state['specialist_messages'][-1]],
+        'patient_id': state.get('patient_id'),
+        'consultation_id': state.get('consultation_id')
+    }
     tool_output_dict = gynec_tool_node.invoke(tool_input)
     tool_output_messages = tool_output_dict['messages']
     return {
@@ -1391,7 +1418,11 @@ def psych_tool_invoker(state: AgentState) -> dict:
     Takes tool calls from 'specialist_messages', runs them,
     and returns the output to be added back to 'specialist_messages'.
     """
-    tool_input = {'messages': [state['specialist_messages'][-1]]}
+    tool_input = {
+        'messages': [state['specialist_messages'][-1]],
+        'patient_id': state.get('patient_id'),
+        'consultation_id': state.get('consultation_id')
+    }
     tool_output_dict = psych_tool_node.invoke(tool_input)
     tool_output_messages = tool_output_dict['messages']
     return {
@@ -1416,7 +1447,11 @@ def med_tool_invoker(state: AgentState) -> dict:
     Takes tool calls from 'specialist_messages', runs them,
     and returns the output to be added back to 'specialist_messages'.
     """
-    tool_input = {'messages': [state['specialist_messages'][-1]]}
+    tool_input = {
+        'messages': [state['specialist_messages'][-1]],
+        'patient_id': state.get('patient_id'),
+        'consultation_id': state.get('consultation_id')
+    }
     tool_output_dict = med_tool_node.invoke(tool_input)
     tool_output_messages = tool_output_dict['messages']
     return {
@@ -1441,7 +1476,11 @@ def patho_tool_invoker(state: AgentState) -> dict:
     Takes tool calls from 'patho_messages', runs them,
     and returns the output to be added back to 'patho_messages'.
     """
-    tool_input = {'messages': [state['patho_messages'][-1]]}
+    tool_input = {
+        'messages': [state['patho_messages'][-1]],
+        'patient_id': state.get('patient_id'),
+        'consultation_id': state.get('consultation_id')
+    }
     tool_output_dict = patho_tool_node.invoke(tool_input)
     tool_output_messages = tool_output_dict['messages']
     return {
@@ -1466,7 +1505,11 @@ def radio_tool_invoker(state: AgentState) -> dict:
     Takes tool calls from 'radio_messages', runs them,
     and returns the output to be added back to 'radio_messages'.
     """
-    tool_input = {'messages': [state['radio_messages'][-1]]}
+    tool_input = {
+        'messages': [state['radio_messages'][-1]],
+        'patient_id': state.get('patient_id'),
+        'consultation_id': state.get('consultation_id')
+    }
     tool_output_dict = radio_tool_node.invoke(tool_input)
     tool_output_messages = tool_output_dict['messages']
     return {
@@ -1517,7 +1560,12 @@ def gp_askuser_invoker(state: AgentState) -> dict:
     return {}
 
 def gp_tool_invoker(state: AgentState) -> dict:
-    tool_input = {'messages': [state['messages'][-1]]}
+    # Pass the FULL state so InjectedState works for patient_id
+    tool_input = {
+        'messages': [state['messages'][-1]],
+        'patient_id': state.get('patient_id'),  # ← CRITICAL for database tools
+        'consultation_id': state.get('consultation_id')
+    }
     tool_output_dict = gp_tool_node.invoke(tool_input)
     return {'messages': tool_output_dict['messages'], 'current_agent': state.get('current_agent', 'GP')}
 
