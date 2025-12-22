@@ -5,7 +5,6 @@ from .routers import users, oauth
 from sqlalchemy.orm import Session
 from . import models, database
 
-# Define your static doctors
 SPECIALISTS = [
     {"name": "Dr. A. Eye", "specialty": "Ophthalmologist"},
     {"name": "Dr. B. Skin", "specialty": "Dermatologist"},
@@ -18,11 +17,9 @@ SPECIALISTS = [
     {"name": "Dr. I. General", "specialty": "GP"},
 ]
 
-# Create a startup function
 def seed_doctors():
     db = database.SessionLocal()
     try:
-        # Check if empty
         if db.query(models.Doctor).count() == 0:
             print("🌱 Seeding Doctors Table...")
             for doc in SPECIALISTS:
@@ -33,9 +30,8 @@ def seed_doctors():
     finally:
         db.close()
 
-# Run it on startup
 models.Base.metadata.create_all(bind=database.engine)
-seed_doctors() # <--- Add this call
+seed_doctors()
 
 
 app = FastAPI()

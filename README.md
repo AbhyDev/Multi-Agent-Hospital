@@ -1,212 +1,384 @@
-# AI Hospital
+# 🏥 AI Hospital — Multi-Agent Medical Consultation System
 
-## How to Run
+> **A full-stack AI-powered virtual hospital** that simulates realistic medical consultations through intelligent agent orchestration, RAG-enhanced diagnostics, and persistent patient records.
 
-> [!IMPORTANT]
-> - Due to Pushing API key to Git as per instructions, Tavily API key might be disabled by provider, please replace current key in case it does not work: "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" 
-> - Clone only the `local_working` branch of the repository (see step 1).
-> - If your virtualenv path differs adjust the `source` command accordingly (e.g. `.venv/bin/activate`).
-> - Backend runs on port `8000`; frontend default Vite port is `5173`.
-
-1. Clone (only the local_working branch)
-
-```bash
-# Clone only the `local_working` branch
-git clone --branch local_working --single-branch https://github.com/AbhyDev/AI-Hospital  # clone only the local_working branch
-cd AI-Hospital  # change into the repository directory (adjust if your repo name differs)
-```
-
-2. Backend:
-
-```bash
-# If you haven't cloned above, run the clone command first (see step 1).
-cd backend                             # change into the backend directory
-uv sync                                # sync/install Python dependencies with 'uv'
-source .venv/bin/activate              # activate the virtual environment created by 'uv'
-cd ..                                   # return to project root to run the app module
-python -m uvicorn backend.main:app --reload --port 8000  # start FastAPI with live reload on port 8000
-```
-
-3. Frontend:
-
-```bash
-# Install node deps and start the dev server.
-cd frontend                            # change into the frontend directory
-npm install                            # install frontend dependencies
-npm run dev                            # start the Vite dev server (at http://localhost:5173)
-```
-
-## Project Description
-
-An AI-powered virtual hospital system that simulates medical consultations using a multi-agent architecture. Patients first interact with a General Practitioner (GP) who triages and routes to specialists (e.g., Ophthalmologist, Dermatologist). Specialists can optionally request assistance from helpers like a Pathologist or Radiologist for advanced diagnostics. The system uses LangGraph for agent orchestration, ChromaDB for retrieval-augmented generation (RAG), and a React frontend for real-time streaming chat.
+![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white)
+![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
+![LangGraph](https://img.shields.io/badge/LangGraph-Orchestration-FF6B6B)
+![ChromaDB](https://img.shields.io/badge/ChromaDB-Vector_Store-4285F4)
 
 ---
 
-## Table of Contents
+## 📋 Table of Contents
 
-1. How to Run
-2. Prerequisites
-3. Backend Setup
-4. Frontend Setup
-5. Usage Flow
-6. Features
-7. Architecture Overview
-8. Tools & Agent Behaviors
-9. Knowledge Base
-10. API Endpoints
-11. Extending
-12. Notes (Poppler / Tesseract)
-13. Dependencies & Requirements
-14. License
+- [Project Overview](#-project-overview)
+- [Key Features](#-key-features)
+- [System Architecture](#-system-architecture)
+- [Tech Stack](#-tech-stack)
+- [Database Design](#-database-design)
+- [Multi-Agent Workflow](#-multi-agent-workflow)
+- [API Design](#-api-design)
+- [Knowledge Base & RAG](#-knowledge-base--rag)
+- [Getting Started](#-getting-started)
 
 ---
 
-## 1. How to Run
+## 🎯 Project Overview
 
-(See top section for the concise commands.)
+AI Hospital is a sophisticated healthcare simulation platform that replicates a real hospital consultation workflow using **multi-agent AI architecture**. The system demonstrates advanced concepts in:
 
-## 2. Prerequisites
+- **Agentic AI Design** — Coordinated multi-agent system with specialized roles
+- **Full-Stack Development** — FastAPI backend + React TypeScript frontend  
+- **Database Engineering** — PostgreSQL with SQLAlchemy ORM for medical records
+- **Real-Time Communication** — Server-Sent Events (SSE) for streaming responses
+- **RAG Implementation** — Domain-specific vector stores for evidence-based responses
+- **Authentication & Security** — JWT-based auth with secure patient data handling
 
-- Python 3.11+ (project uses `uv` for dependency management; you can fall back to `pip install -r requirements.txt` if needed).
-- Node.js 18+ (for the React frontend).
-- Environment variables in a `.env` file at project root:
-  - `GEMINI_API_KEY` (AI model access)
-  - `TAVILY_API_KEY` (web search / internet tool)
+### How It Works
 
-## 3. Backend Setup
+1. **Patient Registration** — Users create accounts with demographic data stored in PostgreSQL
+2. **GP Triage** — AI General Practitioner collects symptoms and routes to appropriate specialist
+3. **Specialist Consultation** — Domain expert AI conducts detailed examination with RAG-powered knowledge
+4. **Helper Integration** — Specialists can request Pathologist/Radiologist assistance for diagnostics
+5. **Report Generation** — Final medical report with diagnosis, treatment plan, and follow-up is persisted to database
 
-(See top section for the concise commands.)
+---
 
-## 4. Frontend Setup
+## ✨ Key Features
 
-(See top section for the concise commands.)
+| Feature | Description |
+|---------|-------------|
+| **Multi-Agent Orchestration** | LangGraph state machine coordinating GP → Specialist → Helper workflows with conditional routing |
+| **8 Medical Specialties** | Ophthalmology, Dermatology, ENT, Gynecology, Internal Medicine, Orthopedics, Pediatrics, Psychiatry |
+| **Retrieval-Augmented Generation** | ChromaDB vector stores with BGE embeddings for evidence-based medical knowledge retrieval |
+| **Real-Time Streaming** | SSE-powered chat with live token streaming and agent transition indicators |
+| **Persistent Medical Records** | Full consultation history, lab orders, results, and final reports stored in PostgreSQL |
+| **JWT Authentication** | Secure patient authentication with token-based API access |
+| **Tool-Augmented Agents** | Custom tools for patient interaction, internet search, RAG retrieval, and report generation |
+| **Multilingual Speech Support** | Optional voice I/O supporting Hindi and English via gTTS + SpeechRecognition |
 
-## 5. Usage Flow
+---
 
-1. Start backend and frontend.
-2. Open the frontend in your browser.
-3. Begin a consultation by describing patient symptoms to the GP agent.
-4. Flow: GP triage → Specialist routing → (optional) Helper involvement → Final Report generation.
-5. Messages stream in real time with speaker labels (GP, Specialist, Helper).
+## 🏗 System Architecture
 
-## 6. Features
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                         FRONTEND (React + Vite)                      │
+│  ┌─────────────┐  ┌──────────────┐  ┌─────────────────────────────┐ │
+│  │ Auth Forms  │  │  Chat UI     │  │  Agent Status + Tool Feed   │ │
+│  │ (Login/     │  │  (SSE Stream │  │  (Real-time agent labels,   │ │
+│  │  Signup)    │  │   Consumer)  │  │   tool call visualization)  │ │
+│  └──────┬──────┘  └──────┬───────┘  └─────────────┬───────────────┘ │
+└─────────┼────────────────┼────────────────────────┼─────────────────┘
+          │                │                        │
+          ▼                ▼                        ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                      BACKEND (FastAPI + LangGraph)                   │
+│                                                                      │
+│  ┌──────────────────┐    ┌────────────────────────────────────────┐ │
+│  │   Auth Router    │    │         LangGraph State Machine         │ │
+│  │  /login          │    │  ┌─────┐    ┌────────────┐    ┌─────┐  │ │
+│  │  /users          │    │  │ GP  │───▶│ Specialist │───▶│ END │  │ │
+│  │  (JWT tokens)    │    │  └──┬──┘    └─────┬──────┘    └─────┘  │ │
+│  └────────┬─────────┘    │     │             │                     │ │
+│           │              │     ▼             ▼                     │ │
+│           │              │  ┌──────┐    ┌──────────┐               │ │
+│           │              │  │Tools │    │ Helpers  │               │ │
+│           │              │  └──────┘    │(Path/Rad)│               │ │
+│           │              │              └──────────┘               │ │
+│           │              └────────────────────────────────────────┘ │
+│           │                              │                          │
+│           ▼                              ▼                          │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │                    SQLAlchemy ORM Layer                      │   │
+│  │   Patient | Doctor | Consultation | LabOrder | MedicalReport │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────┘
+          │                              │
+          ▼                              ▼
+┌──────────────────┐          ┌─────────────────────┐
+│   PostgreSQL     │          │  ChromaDB Vector    │
+│   (Medical       │          │  Stores (9 domains) │
+│    Records)      │          │  BGE-large-en-v1.5  │
+└──────────────────┘          └─────────────────────┘
+```
 
-- **Multi-Agent Consultation Flow**: GP → Specialist → Helper (Pathology/Radiology) when required.
-- **Knowledge-Based RAG**: Specialty PDFs embedded and retrieved via Chroma vector stores.
-- **Real-Time Streaming**: Server-Sent Events (SSE) with incremental chat updates and role tagging.
-- **Supported Specialties**: Ophthalmology, Dermatology, ENT, Gynecology, Internal Medicine, Orthopedics, Pediatrics, Psychiatry.
-- **Extensible**: Add new specialists or helpers by mirroring existing LangGraph wiring patterns.
-- **Report Assembly**: Structured final medical-style report (diagnosis, plan, follow-up) built via `add_report` tool calls.
+---
 
-## 7. Architecture Overview
+## 🛠 Tech Stack
 
-### System Topology
+### Backend
+| Technology | Purpose |
+|------------|---------|
+| **FastAPI** | High-performance async API framework |
+| **LangGraph** | Multi-agent orchestration with stateful graph execution |
+| **SQLAlchemy** | ORM for PostgreSQL database operations |
+| **PostgreSQL** | Relational database for patient records and consultations |
+| **Pydantic** | Data validation and settings management |
+| **python-jose** | JWT token creation and verification |
+| **SSE-Starlette** | Server-Sent Events for real-time streaming |
+| **LangChain** | LLM integrations and tool definitions |
+| **ChromaDB** | Vector database for RAG embeddings |
+| **HuggingFace** | BGE embedding model for semantic search |
+| **Google Gemini** | Primary LLM (gemini-2.5-flash / gemini-2.0-flash) |
+| **Tavily** | Web search API for supplementary information |
 
-- **Backend (`backend/`)**: FastAPI app + LangGraph state machine + CORS config.
-- **Orchestrator (`backend/AI_hospital.py`)**: Defines `AgentState`, routing logic, and tool bindings.
-- **Frontend (`frontend/`)**: Vite + React SPA consuming SSE for streaming conversations.
-- **Knowledge Base**: Pre-built Chroma vector stores in `backend/vector_stores/` sourced from PDFs in `backend/Knowledge Base/`.
+### Frontend
+| Technology | Purpose |
+|------------|---------|
+| **React 18** | Component-based UI with hooks |
+| **TypeScript** | Type-safe frontend development |
+| **Vite** | Fast build tooling and HMR |
+| **EventSource API** | SSE consumption for real-time updates |
 
-### LangGraph Flow Essentials
+---
 
-- `AgentState` maintains multi-stream history, helper Q&A (`patho_QnA`, `radio_QnA`), `next_agent` stack, and `current_report`.
-- The GP must (a) interrogate user via `ask_user`, (b) call `Patient_data_report`, then (c) emit the plain specialist name for routing.
-- Specialists may call helpers (Pathologist / Radiologist). Their answers fold back into the specialist's thread.
-- Completion occurs when a specialist returns a message beginning with `Final Report:`.
+## 🗄 Database Design
 
-## 8. Tools & Agent Behaviors
+```sql
+┌─────────────────┐       ┌──────────────────┐       ┌─────────────────┐
+│    patients     │       │  consultations   │       │    doctors      │
+├─────────────────┤       ├──────────────────┤       ├─────────────────┤
+│ patient_id (PK) │◄──────│ patient_id (FK)  │       │ doctor_id (PK)  │
+│ email           │       │ consultation_id  │       │ name            │
+│ password (hash) │       │ status           │       │ specialty       │
+│ name            │       │ started_at       │       └─────────────────┘
+│ age             │       └────────┬─────────┘
+│ gender          │                │
+│ created_at      │                │
+└─────────────────┘                │
+                                   │
+        ┌──────────────────────────┼──────────────────────────┐
+        │                          │                          │
+        ▼                          ▼                          ▼
+┌───────────────────┐    ┌─────────────────────┐    ┌─────────────────┐
+│    lab_orders     │    │   medical_reports   │    │   lab_results   │
+├───────────────────┤    ├─────────────────────┤    ├─────────────────┤
+│ order_id (PK)     │    │ report_id (PK)      │    │ result_id (PK)  │
+│ consultation_id   │    │ consultation_id(FK) │    │ order_id (FK)   │
+│ test_name         │    │ diagnosis           │    │ findings        │
+│ status            │    │ treatment           │    └─────────────────┘
+└─────────┬─────────┘    └─────────────────────┘
+          │
+          └──────────────────────────────────────────────────────────────┘
+```
 
-- `ask_user(question)` – Pauses the graph awaiting patient input.
-- `VectorRAG_Retrival(query, agent)` – Retrieves up to 5 high-relevance documents from the specialty vector index for grounded responses.
-- `Patient_data_report` – Persists the GP's summarized patient context for downstream specialists.
-- `add_report` – Appends structured findings; final call must include diagnosis, treatment plan, and follow-up.
-- `search_internet` – Tavily-backed broader web lookup (used when authoritative internal knowledge is insufficient). Prefers `VectorRAG_Retrival` first as they are trained on Medical Books.
+### Key Relationships
+- **One-to-Many**: Patient → Consultations (patients can have multiple visits)
+- **One-to-Many**: Consultation → Lab Orders (multiple tests per consultation)
+- **One-to-One**: Lab Order → Lab Result (each test has one result)
+- **One-to-One**: Consultation → Medical Report (final report per consultation)
 
-## 9. Knowledge Base
+---
 
-Vector stores are already created (no re-initialization required).
+## 🤖 Multi-Agent Workflow
 
-- Source PDFs: `backend/Knowledge Base/{specialty}/`
-- Ready-to-use embeddings: `backend/vector_stores/{specialty}/`
+### Agent State Management
+```python
+class AgentState(TypedDict):
+    messages: Sequence[BaseMessage]           # GP conversation history
+    specialist_messages: Sequence[BaseMessage] # Specialist thread
+    patho_messages: Sequence[BaseMessage]     # Pathologist thread
+    radio_messages: Sequence[BaseMessage]     # Radiologist thread
+    patho_QnA: list[str]                      # Pathologist findings
+    radio_QnA: list[str]                      # Radiologist findings
+    next_agent: list[str]                     # Agent routing stack
+    current_report: list[str]                 # Accumulated report sections
+    patient_id: Optional[int]                 # Linked patient record
+```
 
-## 10. API Endpoints
+### Routing Logic
+```
+User Input → GP Node → Router Decision
+                           │
+        ┌──────────────────┼──────────────────┐
+        ▼                  ▼                  ▼
+   [ask_user]        [tool_call]        [specialist_name]
+        │                  │                  │
+        ▼                  ▼                  ▼
+   Pause Graph        Execute Tool      Route to Specialist
+   (await reply)      (Patient_data)    (e.g., Ophthalmology)
+                                              │
+                                              ▼
+                                    Specialist Consultation
+                                              │
+                        ┌─────────────────────┼─────────────────────┐
+                        ▼                     ▼                     ▼
+                   [ask_user]            [need helper]        [Final Report]
+                        │                     │                     │
+                        ▼                     ▼                     ▼
+                   Pause Graph          Route to Helper         END Node
+                                       (Pathologist/           (persist to DB)
+                                        Radiologist)
+```
 
-- `POST /api/graph/start/stream` – Start a new consultation thread (streams SSE events).
-- `POST /api/graph/resume/stream` – Resume after an `ask_user` tool interruption with patient input.
-  SSE Event Types: `thread`, `message`, `ask_user`, `final`.
+### Custom Tool Definitions
+| Tool | Function | Database Impact |
+|------|----------|-----------------|
+| `ask_user` | Pauses graph execution, sends question to frontend via SSE | None |
+| `Patient_data_report` | Compiles GP triage summary | Creates `Consultation` record |
+| `VectorRAG_Retrival` | Queries domain-specific ChromaDB store | None |
+| `search_internet` | Tavily web search for supplementary info | None |
+| `add_report` | Appends findings to consultation | Creates `LabOrder`/`LabResult` or `MedicalReport` |
 
-## 11. Extending
+---
 
-To add a new specialist:
+## 🔌 API Design
 
-1. Create a system prompt block mirroring existing specialists.
-2. Bind required tools (at minimum `ask_user`, `add_report`, and `VectorRAG_Retrival`).
-3. Update the GP router logic to emit the new specialist name.
-4. Add any `*_AskUser` node name to the `ASK_NODES` list in `backend/api.py`.
-5. (If helper interactions needed) integrate with `next_agent` stack management.
+### Authentication Endpoints
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/users/` | Register new patient (returns patient object) |
+| `POST` | `/login` | Authenticate and receive JWT token |
 
-## 12. Notes (Poppler / Tesseract)
+### Graph Streaming Endpoints
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/graph/start/stream` | Start new consultation (SSE stream) |
+| `GET` | `/api/graph/resume/stream` | Resume after `ask_user` interruption |
 
-For a fresh rebuild of vector stores on Windows you would normally install:
+### SSE Event Types
+```typescript
+// Thread initialization
+{ event: "thread", data: { thread_id: string } }
 
-1. Poppler (for PDF processing)
-2. Tesseract OCR (for scanned PDFs)
-   Not required here because all PDFs are already processed and vector stores are pre-built.
+// Agent message (streaming)
+{ event: "message", data: { content: string, speaker: string, current_agent: string } }
 
-### 12.1 Speech-Enabled Notebook (Multilingual)
+// Tool execution notification
+{ event: "tool", data: { id: string, name: string, args: object, agent: string } }
 
-The notebook at `backend/custom_libs/AI_hospital.ipynb` provides an interactive variant of the system with speech I/O:
+// User input requested
+{ event: "ask_user", data: { question: string, speaker: string } }
 
-- Uses `speech_recognition` + Google Speech to text for microphone input (long pauses supported via higher `pause_threshold`).
-- Uses `gTTS` + `pygame` for on-the-fly audio playback (no temp audio files written).
-- Current testing focused on Hindi and English; other languages (e.g., Kannada, Punjabi, etc.) can be added by supplying corresponding language codes to `speech_to_text(lang=...)` / `text_to_speech(lang=...)`.
-- You can speak in Hindi or English and receive a response rendered back in Hindi (extend logic similarly for additional languages).
-- Run the notebook directly if you want a voice-driven consultation loop instead of the web frontend.
+// Consultation complete
+{ event: "final", data: { message: string } }
+```
 
-Prerequisites for the notebook speech features (install if not already present):
+---
 
+## 📚 Knowledge Base & RAG
+
+### Vector Store Architecture
+- **Embedding Model**: `BAAI/bge-large-en-v1.5` (CPU-optimized)
+- **Vector Database**: ChromaDB with persistent storage
+- **Retrieval**: Top-5 similarity search per query
+
+### Specialty Knowledge Domains
+```
+backend/vector_stores/
+├── Ophthalmologist/    # Eye conditions, treatments
+├── Dermatology/        # Skin disorders, dermatological procedures
+├── ENT/                # Ear, nose, throat pathologies
+├── Gynecology/         # Reproductive health, obstetrics
+├── Internal Medicine/  # Systemic diseases, chronic conditions
+├── Orthopedics/        # Musculoskeletal disorders
+├── Pathology/          # Lab diagnostics, disease markers
+├── Pediatrics/         # Child-specific conditions
+└── Psychiatry/         # Mental health, behavioral disorders
+```
+
+### RAG Query Flow
+```
+Specialist Agent → VectorRAG_Retrival(query, "Ophthalmologist")
+                            │
+                            ▼
+                   ChromaDB Similarity Search
+                            │
+                            ▼
+                   Top 5 Relevant Chunks
+                            │
+                            ▼
+                   LLM Synthesis (gemini-2.0-flash)
+                            │
+                            ▼
+                   Context-Grounded Response
+```
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+- Python 3.11+
+- Node.js 18+
+- PostgreSQL 14+
+- `uv` package manager (or pip)
+
+### Environment Variables
+Create `.env` in the backend directory:
+```env
+DATABASE_HOSTNAME=localhost
+DATABASE_PORT=5432
+DATABASE_PASSWORD=your_password
+DATABASE_NAME=ai_hospital
+DATABASE_USERNAME=postgres
+
+SECRET_KEY=your_jwt_secret_key
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=60
+
+GEMINI_API_KEY=your_gemini_key
+TAVILY_API_KEY=your_tavily_key
+```
+
+### Installation
+
+**Backend:**
 ```bash
-pip install gTTS pygame SpeechRecognition pyaudio
+cd backend
+uv sync                    # or: pip install -r requirements.txt
+cd ..
+python -m uvicorn backend.main:app --reload --port 8000
 ```
 
-If `pyaudio` wheels are problematic on Windows, use:
-
+**Frontend:**
 ```bash
-pip install pipwin
-pipwin install pyaudio
+cd frontend
+npm install
+npm run dev                # Runs on http://localhost:5173
 ```
 
-## 13. Dependencies & Requirements
+### Database Setup
+Tables are auto-created on first run via SQLAlchemy. Doctors are seeded automatically with 9 specialists (GP + 8 domain experts).
 
-### 13.1 Backend Python Packages
+---
 
-Declared in `backend/pyproject.toml`:
+## 📁 Project Structure
 
 ```
-fastapi
-gtts
-langchain
-langchain-chroma
-langchain-google-genai
-langchain-groq
-langchain-huggingface
-langchain-tavily
-langgraph
-pygame
-python-dotenv
-sentence-transformers
-speechrecognition
-sse-starlette
-uvicorn
+AI-Hospital/
+├── backend/
+│   ├── main.py              # FastAPI app, DB init, router mounting
+│   ├── api.py               # LangGraph streaming endpoints
+│   ├── AI_hospital.py       # Agent definitions, tools, state machine
+│   ├── database.py          # SQLAlchemy engine and session
+│   ├── models.py            # ORM models (Patient, Consultation, etc.)
+│   ├── schemas.py           # Pydantic request/response models
+│   ├── oauth2.py            # JWT token utilities
+│   ├── config.py            # Pydantic settings from .env
+│   ├── routers/
+│   │   ├── users.py         # Patient registration
+│   │   └── oauth.py         # Login endpoint
+│   ├── Knowledge_notebooks/
+│   │   ├── initialize_rag.py    # Vector store loader
+│   │   └── vector_rag.ipynb     # RAG creation notebook
+│   └── vector_stores/       # Pre-built ChromaDB stores
+│
+└── frontend/
+    ├── src/
+    │   ├── main.tsx         # React entry point
+    │   └── ui/
+    │       ├── App.tsx      # Main chat application
+    │       └── glass.css    # Glassmorphism styling
+    ├── package.json
+    └── vite.config.ts
 ```
 
-Install via `uv sync` (preferred) or `pip install -r requirements.txt`.
+---
 
-### 13.2 Frontend Packages
+## 📄 License
 
-Runtime: `react`, `react-dom`
-Dev: `vite`, `@vitejs/plugin-react`, `typescript`, `@types/react`, `@types/react-dom`
-
-## 14. License
-
-This project is private and not licensed for public use.
+This project is for educational and demonstration purposes.

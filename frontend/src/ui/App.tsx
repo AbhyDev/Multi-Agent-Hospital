@@ -36,7 +36,6 @@ type ToolEventData = {
   agent?: string
 }
 
-// Agent configuration with colors and icons
 const AGENT_CONFIG: Record<string, { icon: string; color: string; gradient: string }> = {
   'GP': { icon: '👨‍⚕️', color: '#7bc6ff', gradient: 'linear-gradient(135deg, #7bc6ff, #5ba3d9)' },
   'Ophthalmologist': { icon: '👁️', color: '#a78bfa', gradient: 'linear-gradient(135deg, #a78bfa, #8b5cf6)' },
@@ -55,9 +54,7 @@ const AGENT_CONFIG: Record<string, { icon: string; color: string; gradient: stri
 
 const getAgentConfig = (speaker?: string) => {
   if (!speaker) return AGENT_CONFIG['AI']
-  // Try exact match first
   if (AGENT_CONFIG[speaker]) return AGENT_CONFIG[speaker]
-  // Try partial match
   const key = Object.keys(AGENT_CONFIG).find(k => 
     speaker.toLowerCase().includes(k.toLowerCase()) || k.toLowerCase().includes(speaker.toLowerCase())
   )
@@ -68,7 +65,7 @@ const formatTime = (date: Date) => {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
-const BACKEND = import.meta.env.VITE_API_BASE || '' // use proxy when ''
+const BACKEND = import.meta.env.VITE_API_BASE || ''
 const LOGIN_URL = 'http://localhost:8000/login'
 const SIGNUP_URL = 'http://localhost:8000/users/'
 const TOKEN_STORAGE_KEY = 'access_token'
@@ -95,7 +92,6 @@ export default function App() {
   const chatRef = useRef<HTMLDivElement>(null)
   const toolListRef = useRef<HTMLDivElement>(null)
 
-  // Cursor-driven glow & subtle tilt
   useEffect(() => {
     const el = containerRef.current ?? document.documentElement
     let raf = 0
@@ -105,7 +101,6 @@ export default function App() {
       document.documentElement.style.setProperty('--mx', `${x}px`)
       document.documentElement.style.setProperty('--my', `${y}px`)
       if (containerRef.current) {
-        // Parallax tilt relative to center
         const rect = containerRef.current.getBoundingClientRect()
         const cx = rect.left + rect.width / 2
         const cy = rect.top + rect.height / 2
@@ -186,7 +181,6 @@ export default function App() {
         const errorData = await response.json().catch(() => ({}))
         throw new Error(errorData.detail || 'Signup failed')
       }
-      // Auto-login after successful signup
       const loginResponse = await fetch(LOGIN_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -206,7 +200,6 @@ export default function App() {
       setPassword('')
       setAge('')
       setGender('')
-      // Trigger confetti animation
       setShowConfetti(true)
       setTimeout(() => setShowConfetti(false), 3000)
     } catch (err) {
@@ -245,14 +238,14 @@ export default function App() {
     es.addEventListener('message', (e) => {
       const data = JSON.parse((e as MessageEvent).data) as MessageEventData
       if (data.current_agent) setCurrentAgent(data.current_agent)
-      if (!data.content?.trim()) return // Do not render empty messages
+      if (!data.content?.trim()) return
       setIsTyping(false)
       setChat((c) => {
         const last = c[c.length - 1]
         if (last && last.role === 'assistant' && last.content === data.content) return c
         return [...c, { role: 'assistant', content: data.content, speaker: data.speaker, timestamp: new Date() }]
       })
-      setIsTyping(true) // Resume typing for potential next message
+      setIsTyping(true)
     })
 
     es.addEventListener('tool', (e) => {
@@ -304,7 +297,7 @@ export default function App() {
     es.addEventListener('message', (e) => {
       const data = JSON.parse((e as MessageEvent).data) as MessageEventData
       if (data.current_agent) setCurrentAgent(data.current_agent)
-      if (!data.content?.trim()) return // Do not render empty messages
+      if (!data.content?.trim()) return
       setIsTyping(false)
       setChat((c) => {
         const last = c[c.length - 1]
@@ -365,11 +358,9 @@ export default function App() {
     if (inputRef.current) inputRef.current.value = ''
   }, [threadId, pendingAsk, startStream, resumeStream, token])
 
-  // Auto-scroll chat & tools
   useEffect(() => { if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight }, [chat])
   useEffect(() => { if (toolListRef.current) toolListRef.current.scrollTop = toolListRef.current.scrollHeight }, [tools])
 
-  // If not authenticated, show the auth gate
   if (!token) {
     return (
       <div className="app-root">

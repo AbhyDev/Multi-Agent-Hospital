@@ -13,9 +13,9 @@ from typing import Annotated, Sequence, TypedDict, List
 from langchain_core.prompts import PromptTemplate
 from langgraph.prebuilt import ToolNode
 from langgraph.graph import StateGraph, START, END
-from langgraph.prebuilt import InjectedState # <--- CRITICAL: Allows tools to see patient_id
-from .database import SessionLocal # <--- Database Connection
-from . import models # <--- Database Tables
+from langgraph.prebuilt import InjectedState
+from .database import SessionLocal
+from . import models
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from Knowledge_notebooks.initialize_rag import VectorRAG_initialize
@@ -42,33 +42,19 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 import os
 from dotenv import load_dotenv
 from google.api_core.exceptions import ResourceExhausted
-from tenacity import wait_exponential # <-- Import this
+from tenacity import wait_exponential
 
 load_dotenv()
 
 llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash", # Using 1.5-flash as it's a common, recent model
+    model="gemini-2.5-flash",
     google_api_key=os.getenv("GEMINI_API_KEY"),
 )
 
-# llm = llm_base.with_retry(
-#     stop_after_attempt=3,
-#     # Correct way to set exponential backoff
-#     wait=wait_exponential(multiplier=1, max=10), 
-#     retry_if_exception_type=ResourceExhausted
-# )
-
-# Apply the same fix for the second instance
 llm_rag = ChatGoogleGenerativeAI(
     model="gemini-2.0-flash",
     google_api_key=os.getenv("GEMINI_API_KEY"),
 )
-
-# llm_rag = llm_rag_base.with_retry(
-#     stop_after_attempt=3,
-#     wait=wait_exponential(multiplier=1, max=10),
-#     retry_if_exception_type=ResourceExhausted
-# )
 
 print("LLM instances with retry logic configured successfully.")
 
@@ -87,11 +73,6 @@ def ask_user(question: str) -> str:
     Returns:
         str: Answer provided by the Patient, or a status message if input fails.
     """
-    # NOTE: In web apps we do not read from stdin here. This tool's call
-    # is intercepted by the graph before execution (interrupt_before on
-    # a dedicated *_AskUser node). The actual user answer is collected by
-    # the frontend and injected on resume as a ToolMessage. Returning a
-    # marker helps during local CLI runs.
     return f"ASK_USER:{question}"
 
 
@@ -107,7 +88,6 @@ def search_internet(query: str) -> str:
     """
     try:
         result = tavily_search.invoke({"query": query})
-        # If result is structured (dict/list), format nicely
         if isinstance(result, (dict, list)):
             import json
             return json.dumps(result, indent=2)
@@ -116,25 +96,12 @@ def search_internet(query: str) -> str:
         return f"Search failed: {str(e)}"
 
 
-# @tool
-# def add_report(report: str) -> str:
-#     """Add a report to the current patient's record.
-
-#     Args:
-#         report (str): The report content to add.
-
-#     Returns:
-#         str: Confirmation message.
-#     """
-#     return "Report added to patient's record."
-
 @tool
 def add_report(report: str, state: Annotated[dict, InjectedState]) -> str:
     """
     Add a report. Automatically attaches to the currently ACTIVE consultation.
     """
     
-    # 1. Get Patient ID
     current_patient_id = state.get("patient_id")
     if not current_patient_id:
         return "Error: No Patient ID linked."
@@ -143,8 +110,6 @@ def add_report(report: str, state: Annotated[dict, InjectedState]) -> str:
 
     try:
         with SessionLocal() as db:
-            # 2. CRITICAL: Find the 'Active' consultation for THIS patient
-            # This replaces the need to store ID in state.
             consult = db.query(models.Consultation).filter(
                 models.Consultation.patient_id == current_patient_id,
                 models.Consultation.status == 'Active'
@@ -154,19 +119,17 @@ def add_report(report: str, state: Annotated[dict, InjectedState]) -> str:
                 return "Error: No Active Consultation found. Please triage patient first."
 
             if is_final:
-                # Close the session
                 db_report = models.MedicalReport(
                     consultation_id=consult.consultation_id,
                     diagnosis=report,
                     treatment="See details"
                 )
                 db.add(db_report)
-                consult.status = "Completed" # <--- Closes the loop
+                consult.status = "Completed"
                 db.commit()
                 print(f"✅ DB: Saved FINAL REPORT for Consult #{consult.consultation_id}")
                 
             else:
-                # Helper Result
                 new_order = models.LabOrder(
                     consultation_id=consult.consultation_id,
                     test_name="Helper Finding",
@@ -195,23 +158,20 @@ def Patient_data_report(data: str, state: Annotated[dict, InjectedState]) -> str
     global patient_info
     patient_info = data
     
-    # 1. Get Patient ID (Passed from API -> State)
     current_patient_id = state.get("patient_id")
     if not current_patient_id:
         return "Error: Patient ID not found."
 
     try:
         with SessionLocal() as db:
-            # 2. Safety Check: Close any old "stuck" active sessions for this patient
             existing = db.query(models.Consultation).filter(
                 models.Consultation.patient_id == current_patient_id,
                 models.Consultation.status == "Active"
             ).first()
             if existing:
                 existing.status = "Abandoned"
-                db.commit()  # ← COMMIT THE ABANDONED STATUS
+                db.commit()
             
-            # 3. Create NEW Consultation
             new_consult = models.Consultation(
                 patient_id=current_patient_id,
                 status="Active"
@@ -292,7 +252,6 @@ radllm = llm.bind_tools([ask_user, search_internet, add_report])
 pathllm = llm.bind_tools([ask_user, search_internet, add_report, VectorRAG_Retrival])
 
 def general_physician(state: AgentState) -> AgentState:
-    # Implement the logic for the general physician agent
     SystemPrompt = SystemMessage(content=f"""
 You are a Medical Router AI / General Physician.
 
@@ -343,7 +302,6 @@ def router_gp(state: AgentState) -> AgentState:
     last_message = state['messages'][-1]
     content = last_message.content.lower()
     if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
-        # Route ask_user separately so we can interrupt before it
         ask_user_called = any(tc.get('name') == 'ask_user' for tc in last_message.tool_calls)
         if ask_user_called:
             return "GP_AskUser"
@@ -377,7 +335,6 @@ def router_gp(state: AgentState) -> AgentState:
 
 
 def Ophthalmologist(state: AgentState) -> AgentState:
-    # Implement the logic for the ophthalmologist agent
     global patient_info
     SystemPrompt = SystemMessage(content=f"""You are a High Quality Ophthalmologist.
 
@@ -424,7 +381,6 @@ Rules:
     return {'specialist_messages' : [response], 'current_agent': 'Ophthalmologist'}
 
 def router_opthal(state: AgentState) -> AgentState:
-    # Route the request to the appropriate ophthalmologist agent
     global final_report
     last_message = state['specialist_messages'][-1]
     content = last_message.content.lower()
@@ -441,13 +397,11 @@ def router_opthal(state: AgentState) -> AgentState:
         return "Ophthal_Tooler"
     
     elif "pathologist" in content:
-        # Record caller so helpers know who invoked them
         state['next_agent'].append('Ophthalmologist')
         state["patho_QnA"].append("Question from Ophthalmologist to Pathologist: ")
         state["patho_QnA"].append(last_message.content)
         return "Pathologist"
     elif "radiologist" in content:
-        # Record caller so helpers know who invoked them
         state['next_agent'].append('Ophthalmologist')
         state['radio_QnA'].append("Question from Ophthalmologist to Radiologist: ")
         state['radio_QnA'].append(last_message.content)
@@ -460,7 +414,6 @@ def router_opthal(state: AgentState) -> AgentState:
         return "Ophthalmologist"
 
 def Pediatrician(state: AgentState) -> AgentState:
-    # Implement the logic for the pediatrician agent
     global patient_info
     SystemPrompt = SystemMessage(content=f"""You are a High Quality Pediatrician.
 
@@ -507,7 +460,6 @@ Rules:
     return {'specialist_messages' : [response], 'current_agent': 'Pediatrician'}
 
 def router_pedia(state: AgentState) -> AgentState:
-    # Route the request to the appropriate ophthalmologist agent
     global final_report
     last_message = state['specialist_messages'][-1]
     content = last_message.content.lower()
@@ -523,13 +475,11 @@ def router_pedia(state: AgentState) -> AgentState:
         return "Pedia_Tooler"
     
     elif "pathologist" in content:
-        # Record caller so helpers know who invoked them
         state['next_agent'].append('Pediatrician')
         state["patho_QnA"].append("Question from Pediatrician to Pathologist: ")
         state["patho_QnA"].append(last_message.content)
         return "Pathologist"
     elif "radiologist" in content:
-        # Record caller so helpers know who invoked them
         state['next_agent'].append('Pediatrician')
         state['radio_QnA'].append("Question from Pediatrician to Radiologist: ")
         state['radio_QnA'].append(last_message.content)
@@ -542,7 +492,6 @@ def router_pedia(state: AgentState) -> AgentState:
         return "Pediatrician"
 
 def Orthopedist(state: AgentState) -> AgentState:
-    # Implement the logic for the orthopedist agent
     global patient_info
     SystemPrompt = SystemMessage(content=f"""You are a High Quality Orthopedist.
 
@@ -589,7 +538,6 @@ Rules:
     return {'specialist_messages' : [response], 'current_agent': 'Orthopedist'}
 
 def router_ortho(state: AgentState) -> AgentState:
-    # Route the request to the appropriate ophthalmologist agent
     global final_report
     last_message = state['specialist_messages'][-1]
     content = last_message.content.lower()
@@ -605,13 +553,11 @@ def router_ortho(state: AgentState) -> AgentState:
         return "Ortho_Tooler"
     
     elif "pathologist" in content:
-        # Record caller so helpers know who invoked them
         state['next_agent'].append('Orthopedist')
         state["patho_QnA"].append("Question from Orthopedist to Pathologist: ")
         state["patho_QnA"].append(last_message.content)
         return "Pathologist"
     elif "radiologist" in content:
-        # Record caller so helpers know who invoked them
         state['next_agent'].append('Orthopedist')
         state['radio_QnA'].append("Question from Orthopedist to Radiologist: ")
         state['radio_QnA'].append(last_message.content)
@@ -624,7 +570,6 @@ def router_ortho(state: AgentState) -> AgentState:
         return "Orthopedist"
 
 def Dermatologist(state: AgentState) -> AgentState:
-    # Implement the logic for the dermatologist agent
     global patient_info
     SystemPrompt = SystemMessage(content=f"""You are a High Quality Dermatologist.
 
@@ -671,7 +616,6 @@ Rules:
     return {'specialist_messages' : [response], 'current_agent': 'Dermatologist'}
 
 def router_dermat(state: AgentState) -> AgentState:
-    # Route the request to the appropriate dermatologist agent
     global final_report
     last_message = state['specialist_messages'][-1]
     content = last_message.content.lower()
@@ -687,13 +631,11 @@ def router_dermat(state: AgentState) -> AgentState:
         return "Dermat_Tooler"
     
     elif "pathologist" in content:
-        # Record caller so helpers know who invoked them
         state['next_agent'].append('Dermatologist')
         state["patho_QnA"].append("Question from Dermatologist to Pathologist: ")
         state["patho_QnA"].append(last_message.content)
         return "Pathologist"
     elif "radiologist" in content:
-        # Record caller so helpers know who invoked them
         state['next_agent'].append('Dermatologist')
         state['radio_QnA'].append("Question from Dermatologist to Radiologist: ")
         state['radio_QnA'].append(last_message.content)
@@ -706,7 +648,6 @@ def router_dermat(state: AgentState) -> AgentState:
         return "Dermatologist"
 
 def ENT(state: AgentState) -> AgentState:
-    # Implement the logic for the ENT agent
     global patient_info
     SystemPrompt = SystemMessage(content=f"""You are a High Quality ENT Specialist.
 
@@ -753,7 +694,6 @@ Rules:
     return {'specialist_messages' : [response], 'current_agent': 'ENT'}
 
 def router_ent(state: AgentState) -> AgentState:
-    # Route the request to the appropriate ENT agent
     global final_report
     last_message = state['specialist_messages'][-1]
     content = last_message.content.lower()
@@ -769,13 +709,11 @@ def router_ent(state: AgentState) -> AgentState:
         return "ENT_Tooler"
 
     elif "pathologist" in content:
-        # Record caller so helpers know who invoked them
         state['next_agent'].append('ENT')
         state["patho_QnA"].append("Question from ENT to Pathologist: ")
         state["patho_QnA"].append(last_message.content)
         return "Pathologist"
     elif "radiologist" in content:
-        # Record caller so helpers know who invoked them
         state['next_agent'].append('ENT')
         state['radio_QnA'].append("Question from ENT to Radiologist: ")
         state['radio_QnA'].append(last_message.content)
@@ -788,7 +726,6 @@ def router_ent(state: AgentState) -> AgentState:
         return "ENT"
 
 def Gynecologist(state: AgentState) -> AgentState:
-    # Implement the logic for the Gynecologist agent
     global patient_info
     SystemPrompt = SystemMessage(content=f"""You are a High Quality Gynecologist.
 
@@ -835,7 +772,6 @@ Rules:
     return {'specialist_messages' : [response], 'current_agent': 'Gynecologist'}
 
 def router_gynec(state: AgentState) -> AgentState:
-    # Route the request to the appropriate gynecologist agent
     global final_report
     last_message = state['specialist_messages'][-1]
     content = last_message.content.lower()
@@ -851,13 +787,11 @@ def router_gynec(state: AgentState) -> AgentState:
         return "Gynec_Tooler"
     
     elif "pathologist" in content:
-        # Record caller so helpers know who invoked them
         state['next_agent'].append('Gynecologist')
         state["patho_QnA"].append("Question from Gynecologist to Pathologist: ")
         state["patho_QnA"].append(last_message.content)
         return "Pathologist"
     elif "radiologist" in content:
-        # Record caller so helpers know who invoked them
         state['next_agent'].append('Gynecologist')
         state['radio_QnA'].append("Question from Gynecologist to Radiologist: ")
         state['radio_QnA'].append(last_message.content)
@@ -870,7 +804,6 @@ def router_gynec(state: AgentState) -> AgentState:
         return "Gynecologist"
 
 def Psychiatrist(state: AgentState) -> AgentState:
-    # Implement the logic for the psychiatrist agent
     global patient_info
     SystemPrompt = SystemMessage(content=f"""You are a High Quality Psychiatrist.
 
@@ -917,7 +850,6 @@ Rules:
     return {'specialist_messages' : [response], 'current_agent': 'Psychiatrist'}
 
 def router_psych(state: AgentState) -> AgentState:
-    # Route the request to the appropriate psychiatrist agent
     global final_report
     last_message = state['specialist_messages'][-1]
     content = last_message.content.lower()
@@ -933,13 +865,11 @@ def router_psych(state: AgentState) -> AgentState:
         return "Psych_Tooler"
 
     elif "pathologist" in content:
-        # Record caller so helpers know who invoked them
         state['next_agent'].append('Psychiatrist')
         state["patho_QnA"].append("Question from Psychiatrist to Pathologist: ")
         state["patho_QnA"].append(last_message.content)
         return "Pathologist"
     elif "radiologist" in content:
-        # Record caller so helpers know who invoked them
         state['next_agent'].append('Psychiatrist')
         state['radio_QnA'].append("Question from Psychiatrist to Radiologist: ")
         state['radio_QnA'].append(last_message.content)
@@ -953,7 +883,6 @@ def router_psych(state: AgentState) -> AgentState:
 
 
 def Internal_Medicine(state: AgentState) -> AgentState:
-    # Implement the logic for the Internal Medicine agent
     global patient_info
     SystemPrompt = SystemMessage(content=f"""You are a High Quality Internal Medicine Specialist.
 
@@ -1000,7 +929,6 @@ Rules:
     return {'specialist_messages' : [response], 'current_agent': 'Internal Medicine'}
 
 def router_medicine(state: AgentState) -> AgentState:
-    # Route the request to the appropriate internal medicine agent
     global final_report
     last_message = state['specialist_messages'][-1]
     content = last_message.content.lower()
@@ -1016,13 +944,11 @@ def router_medicine(state: AgentState) -> AgentState:
         return "IntMed_Tooler"
     
     elif "pathologist" in content:
-        # Record caller so helpers know who invoked them
         state['next_agent'].append('Internal Medicine')
         state["patho_QnA"].append("Question from Internal Medicine to Pathologist: ")
         state["patho_QnA"].append(last_message.content)
         return "Pathologist"
     elif "radiologist" in content:
-        # Record caller so helpers know who invoked them
         state['next_agent'].append('Internal Medicine')
         state['radio_QnA'].append("Question from Internal Medicine to Radiologist: ")
         state['radio_QnA'].append(last_message.content)
@@ -1035,7 +961,6 @@ def router_medicine(state: AgentState) -> AgentState:
         return "Internal Medicine"
 
 def Pathologist(state: AgentState) -> AgentState:
-    # Implement the logic for the pathologist agent
     global patient_info
     callers = state.get('next_agent') or []
     caller = callers[-1] if callers else "General Physician"
@@ -1072,7 +997,6 @@ def Pathologist(state: AgentState) -> AgentState:
 
 
 def router_patho(state: AgentState) -> AgentState:
-    # Route the request to the appropriate pathologist agent
     last_message = state['patho_messages'][-1]
     if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
         ask_user_called = any(tc.get('name') == 'ask_user' for tc in last_message.tool_calls)
@@ -1086,10 +1010,8 @@ def router_patho(state: AgentState) -> AgentState:
     elif "final report" in last_message.content.lower() and "specialist" in last_message.content.lower():
         state["patho_QnA"].append("Pathologist Answer report to specialist:")
         state["patho_QnA"].append(last_message.content)
-        # Safely route back to the caller; infer from history if stack is empty
         if state.get('next_agent') and len(state['next_agent']) > 0:
             return state['next_agent'].pop()
-        # Infer caller from QnA trail
         caller_map = {
             'ophthalmologist': 'Ophthalmologist',
             'orthopedist': 'Orthopedist',
@@ -1105,13 +1027,11 @@ def router_patho(state: AgentState) -> AgentState:
             for key, node in caller_map.items():
                 if f"from {key}" in low:
                     return node
-        # Last-resort: go back to a common specialist
         return "Orthopedist"
     else:
         return "Pathologist"
 
 def Radiologist(state: AgentState) -> AgentState:
-    # Implement the logic for the radiologist agent
     global patient_info
     callers = state.get('next_agent') or []
     caller = callers[-1] if callers else "General Physician"
@@ -1142,7 +1062,6 @@ def Radiologist(state: AgentState) -> AgentState:
     return {'radio_messages': [response], 'current_agent': 'Radiologist'}
 
 def router_radio(state: AgentState) -> AgentState:
-    # Route the request to the appropriate radiologist agent
     last_message = state['radio_messages'][-1]
     if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
         ask_user_called = any(tc.get('name') == 'ask_user' for tc in last_message.tool_calls)
@@ -1156,7 +1075,6 @@ def router_radio(state: AgentState) -> AgentState:
     elif "final report" in last_message.content.lower() and "specialist" in last_message.content.lower():
         state["radio_QnA"].append("Radiologist Answer report to specialist:")
         state["radio_QnA"].append(last_message.content)
-        # Safely route back to the caller; infer from history if stack is empty
         if state.get('next_agent') and len(state['next_agent']) > 0:
             return state['next_agent'].pop()
         caller_map = {
@@ -1193,23 +1111,17 @@ radio_tools = [ask_user, search_internet, add_report]
 
 opthal_tool_node = ToolNode(opthal_tools)
 
-# The corrected "adapter" node for the graph
 def opthal_tool_invoker(state: AgentState) -> dict:
     """
     Takes tool calls from 'specialist_messages', runs them,
     and returns the output to be added back to 'specialist_messages'.
     """
-    # Create the dictionary input the ToolNode expects
     tool_input = {'messages': [state['specialist_messages'][-1]]}
     
-    # Run the standard ToolNode. It returns a dictionary like {'messages': [ToolMessage(...)]}
     tool_output_dict = opthal_tool_node.invoke(tool_input)
     
-    # *** THIS IS THE NEW LINE ***
-    # We must extract the list of messages from that dictionary
     tool_output_messages = tool_output_dict['messages']
     
-    # Return the list under the correct key for our specialist agent
     return {'specialist_messages': tool_output_messages}
 
 agents = ["General Physician", "Pediatrics", "Ophthalmology", "Orthopedics", "Gastroenterology",
@@ -1227,7 +1139,6 @@ patho_tool_node = ToolNode(patho_tools)
 radio_tool_node = ToolNode(radio_tools)
 gp_tool_node = ToolNode(gp_tools)
 
-# Ask-user-only tool nodes (one per agent family), used to intercept and pause before execution
 gp_ask_toolnode = ToolNode([ask_user])
 opthal_ask_toolnode = ToolNode([ask_user])
 pedia_ask_toolnode = ToolNode([ask_user])
@@ -1560,10 +1471,9 @@ def gp_askuser_invoker(state: AgentState) -> dict:
     return {}
 
 def gp_tool_invoker(state: AgentState) -> dict:
-    # Pass the FULL state so InjectedState works for patient_id
     tool_input = {
         'messages': [state['messages'][-1]],
-        'patient_id': state.get('patient_id'),  # ← CRITICAL for database tools
+        'patient_id': state.get('patient_id'),
         'consultation_id': state.get('consultation_id')
     }
     tool_output_dict = gp_tool_node.invoke(tool_input)
@@ -1751,7 +1661,6 @@ graph.add_conditional_edges(
 )
 from langgraph.checkpoint.memory import MemorySaver
 memory = MemorySaver()
-# Interrupt before every *_AskUser node so the API can collect input from frontend
 myapp = graph.compile(
     interrupt_before=[
         "GP_AskUser","Ophthal_AskUser","Pedia_AskUser","Ortho_AskUser",

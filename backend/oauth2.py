@@ -6,7 +6,6 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from .config import settings
 
-# This tells FastAPI that the login endpoint is at /login
 oauth2_schema = OAuth2PasswordBearer(tokenUrl='login')
 
 SECRET_KEY = settings.secret_key
@@ -31,7 +30,6 @@ def verify_access_token(token: str, credentials_exception):
         raise credentials_exception
     return token_data
 
-# --- CRITICAL CHANGE HERE ---
 def get_current_user(token: str = Depends(oauth2_schema), db: Session = Depends(database.get_db)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -41,7 +39,6 @@ def get_current_user(token: str = Depends(oauth2_schema), db: Session = Depends(
     
     token = verify_access_token(token, credentials_exception)
     
-    # CHANGED: Query 'Patient' table using 'patient_id'
     patient = db.query(models.Patient).filter(models.Patient.patient_id == token.id).first()
 
     if patient is None:

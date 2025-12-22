@@ -11,9 +11,6 @@ import json
 
 router = APIRouter()
 
-# ---------------------------
-# Helpers
-# ---------------------------
 ASK_NODES = {
     "GP_AskUser", "Ophthal_AskUser", "Pedia_AskUser", "Ortho_AskUser",
     "Dermat_AskUser", "ENT_AskUser", "Gynec_AskUser", "Psych_AskUser",
@@ -24,7 +21,6 @@ def _make_config(thread_id: str):
     return {"configurable": {"thread_id": thread_id}}
 
 def _initial_inputs(user_text: str, patient_id: int):
-    # Initialize all streams to keep graph happy
     base_human = HumanMessage(content=user_text)
     return {
         "messages": [base_human],
@@ -77,7 +73,6 @@ def _last_assistant_text(state_values: dict) -> Optional[str]:
         last = msgs[-1]
         if hasattr(last, "content") and isinstance(last.content, str):
             text = last.content.strip()
-            # Suppress bare routing tokens
             if key == "messages" and text.lower() in {
                 "pediatrician", "pediatrics", "ophthalmologist", "orthopedist", "dermatologist",
                 "ent", "gynecologist", "psychiatrist", "internal medicine"
@@ -144,9 +139,6 @@ def _new_tool_calls(chunk: dict, seen_ids: set) -> list[dict]:
                 })
     return out
 
-# ---------------------------
-# Endpoints
-# ---------------------------
 @router.get("/graph/start/stream")
 async def start_graph_stream(
     message: str, 

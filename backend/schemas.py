@@ -2,7 +2,6 @@ from pydantic import BaseModel, EmailStr
 from datetime import datetime
 from typing import Optional
 
-# --- Auth Schemas (Copied from Fastend User) ---
 class PatientCreate(BaseModel):
     email: EmailStr
     password: str
@@ -21,7 +20,6 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     id: Optional[str] = None
 
-# --- Response Schemas (For returning data to frontend) ---
 class PatientOut(BaseModel):
     patient_id: int
     email: EmailStr
@@ -31,7 +29,6 @@ class PatientOut(BaseModel):
     class Config:
         from_attributes = True
 
-# --- Medical Schemas (Optional, but good for Tool validation) ---
 class ConsultationOut(BaseModel):
     consultation_id: int
     status: str
