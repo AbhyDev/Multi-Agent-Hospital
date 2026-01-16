@@ -36,6 +36,33 @@ type ToolEventData = {
   agent?: string
 }
 
+// ============================================================================
+// History Panel Types (SQL JOIN Query Results)
+// ============================================================================
+type ConsultationHistory = {
+  consultation_id: number
+  status: string
+  started_at: string
+  diagnosis: string | null
+  treatment: string | null
+}
+
+type LabResultHistory = {
+  order_id: number
+  test_name: string
+  order_status: string
+  findings: string | null
+  consultation_date: string
+}
+
+type HistorySummary = {
+  total_consultations: number
+  total_lab_orders: number
+  total_reports: number
+  patient_name: string
+  patient_email: string
+}
+
 const AGENT_CONFIG: Record<string, { icon: string; color: string; gradient: string }> = {
   'GP': { icon: '👨‍⚕️', color: '#7bc6ff', gradient: 'linear-gradient(135deg, #7bc6ff, #5ba3d9)' },
   'Ophthalmologist': { icon: '👁️', color: '#a78bfa', gradient: 'linear-gradient(135deg, #a78bfa, #8b5cf6)' },
@@ -55,7 +82,7 @@ const AGENT_CONFIG: Record<string, { icon: string; color: string; gradient: stri
 const getAgentConfig = (speaker?: string) => {
   if (!speaker) return AGENT_CONFIG['AI']
   if (AGENT_CONFIG[speaker]) return AGENT_CONFIG[speaker]
-  const key = Object.keys(AGENT_CONFIG).find(k => 
+  const key = Object.keys(AGENT_CONFIG).find(k =>
     speaker.toLowerCase().includes(k.toLowerCase()) || k.toLowerCase().includes(speaker.toLowerCase())
   )
   return key ? AGENT_CONFIG[key] : AGENT_CONFIG['AI']
@@ -68,6 +95,7 @@ const formatTime = (date: Date) => {
 const BACKEND = import.meta.env.VITE_API_BASE || ''
 const LOGIN_URL = 'http://localhost:8000/login'
 const SIGNUP_URL = 'http://localhost:8000/users/'
+const HISTORY_BASE = 'http://localhost:8000/history'
 const TOKEN_STORAGE_KEY = 'access_token'
 
 export default function App() {
@@ -90,6 +118,14 @@ export default function App() {
   const inputRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const chatRef = useRef<HTMLDivElement>(null)
+
+  // History panel state
+  const [showHistory, setShowHistory] = useState(false)
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [consultations, setConsultations] = useState<ConsultationHistory[]>([])
+  const [labResults, setLabResults] = useState<LabResultHistory[]>([])
+  const [summary, setSummary] = useState<HistorySummary | null>(null)
+  const [historyTab, setHistoryTab] = useState<'consultations' | 'labs'>('consultations')
   const toolListRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -169,9 +205,9 @@ export default function App() {
       const response = await fetch(SIGNUP_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          name: name.trim(), 
-          email: email.trim(), 
+        body: JSON.stringify({
+          name: name.trim(),
+          email: email.trim(),
           password: password.trim(),
           age: ageNum,
           gender: gender.trim()
@@ -218,6 +254,41 @@ export default function App() {
     setPendingAsk(null)
     setCurrentAgent('GP')
   }, [])
+
+  // ============================================================================
+  // History Panel — Fetch data using SQL JOIN endpoints
+  // ============================================================================
+  const fetchHistory = useCallback(async () => {
+    const activeToken = token || localStorage.getItem(TOKEN_STORAGE_KEY)
+    if (!activeToken) return
+
+    setHistoryLoading(true)
+    try {
+      const headers = { 'Authorization': `Bearer ${activeToken}` }
+
+      // Parallel fetch all history endpoints
+      const [consultRes, labRes, summaryRes] = await Promise.all([
+        fetch(`${HISTORY_BASE}/consultations`, { headers }),
+        fetch(`${HISTORY_BASE}/lab-results`, { headers }),
+        fetch(`${HISTORY_BASE}/summary`, { headers })
+      ])
+
+      if (consultRes.ok) setConsultations(await consultRes.json())
+      if (labRes.ok) setLabResults(await labRes.json())
+      if (summaryRes.ok) setSummary(await summaryRes.json())
+    } catch (err) {
+      console.error('Failed to fetch history:', err)
+    } finally {
+      setHistoryLoading(false)
+    }
+  }, [token])
+
+  const toggleHistory = useCallback(() => {
+    setShowHistory(prev => {
+      if (!prev) fetchHistory() // Fetch when opening
+      return !prev
+    })
+  }, [fetchHistory])
 
   const startStream = useCallback((userText: string) => {
     const activeToken = token || localStorage.getItem(TOKEN_STORAGE_KEY)
@@ -290,9 +361,9 @@ export default function App() {
     }
     const url = `${BACKEND}/api/graph/resume/stream?thread_id=${encodeURIComponent(tid)}&user_reply=${encodeURIComponent(reply)}&token=${encodeURIComponent(activeToken)}`
     const es = new EventSource(url)
-  setPendingAsk(null)
-  setChat((c) => [...c, { role: 'user', content: reply, timestamp: new Date() }])
-  setIsTyping(true)
+    setPendingAsk(null)
+    setChat((c) => [...c, { role: 'user', content: reply, timestamp: new Date() }])
+    setIsTyping(true)
 
     es.addEventListener('message', (e) => {
       const data = JSON.parse((e as MessageEvent).data) as MessageEventData
@@ -484,6 +555,7 @@ export default function App() {
             </div>
           </div>
           <div className="header-right">
+            <button className="btn history-btn" type="button" onClick={toggleHistory}>📋 History</button>
             <div className="badge pulse">Live</div>
             <button className="btn logout-btn" type="button" onClick={handleLogout}>Logout</button>
           </div>
@@ -505,8 +577,8 @@ export default function App() {
             {chat.map((m: ChatItem, i: number) => {
               const agentConfig = getAgentConfig(m.speaker)
               return (
-                <div 
-                  key={i} 
+                <div
+                  key={i}
                   className={`bubble ${m.role === 'user' ? 'user' : 'assistant'} fade-slide-in`}
                   style={m.role === 'assistant' ? { '--agent-color': agentConfig.color } as React.CSSProperties : undefined}
                 >
@@ -566,7 +638,7 @@ export default function App() {
               {tools.map((t, idx) => {
                 const toolAgent = getAgentConfig(t.agent)
                 return (
-                  <div key={t.id} className={`tool-card tool-${t.name?.replace(/[^a-z0-9_]/gi,'').toLowerCase()} fade-slide-in`}>
+                  <div key={t.id} className={`tool-card tool-${t.name?.replace(/[^a-z0-9_]/gi, '').toLowerCase()} fade-slide-in`}>
                     {idx > 0 && <div className="tool-arrow">↓</div>}
                     <div className="tool-name">{t.name}</div>
                     <div className="tool-meta">
@@ -593,6 +665,114 @@ export default function App() {
             </button>
           </form>
         </div>
+
+        {/* History Panel Overlay */}
+        {showHistory && (
+          <div className="history-overlay fade-in">
+            <div className="history-panel glass fade-slide-in">
+              <div className="history-header">
+                <h2>📋 Medical History</h2>
+                <button className="history-close" onClick={toggleHistory}>✕</button>
+              </div>
+
+              {/* Summary Stats */}
+              {summary && (
+                <div className="history-summary">
+                  <div className="summary-card">
+                    <span className="summary-value">{summary.total_consultations}</span>
+                    <span className="summary-label">Consultations</span>
+                  </div>
+                  <div className="summary-card">
+                    <span className="summary-value">{summary.total_lab_orders}</span>
+                    <span className="summary-label">Lab Orders</span>
+                  </div>
+                  <div className="summary-card">
+                    <span className="summary-value">{summary.total_reports}</span>
+                    <span className="summary-label">Reports</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Tab Navigation */}
+              <div className="history-tabs">
+                <button
+                  className={`history-tab ${historyTab === 'consultations' ? 'active' : ''}`}
+                  onClick={() => setHistoryTab('consultations')}
+                >
+                  🩺 Consultations
+                </button>
+                <button
+                  className={`history-tab ${historyTab === 'labs' ? 'active' : ''}`}
+                  onClick={() => setHistoryTab('labs')}
+                >
+                  🔬 Lab Results
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="history-content">
+                {historyLoading ? (
+                  <div className="history-loading">
+                    <div className="typing-indicator">
+                      <span></span><span></span><span></span>
+                    </div>
+                    <p>Loading history...</p>
+                  </div>
+                ) : historyTab === 'consultations' ? (
+                  consultations.length === 0 ? (
+                    <div className="history-empty">No consultations yet. Start a consultation to see your history!</div>
+                  ) : (
+                    consultations.map(c => (
+                      <div key={c.consultation_id} className="history-card consultation-card">
+                        <div className="card-header">
+                          <span className="card-id">#{c.consultation_id}</span>
+                          <span className={`card-status status-${c.status.toLowerCase()}`}>{c.status}</span>
+                        </div>
+                        <div className="card-date">{new Date(c.started_at).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+                        {c.diagnosis && (
+                          <div className="card-section">
+                            <span className="section-label">Diagnosis</span>
+                            <p className="section-content">{c.diagnosis}</p>
+                          </div>
+                        )}
+                        {c.treatment && (
+                          <div className="card-section">
+                            <span className="section-label">Treatment</span>
+                            <p className="section-content">{c.treatment}</p>
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )
+                ) : (
+                  labResults.length === 0 ? (
+                    <div className="history-empty">No lab results yet.</div>
+                  ) : (
+                    labResults.map(l => (
+                      <div key={l.order_id} className="history-card lab-card">
+                        <div className="card-header">
+                          <span className="card-test">{l.test_name}</span>
+                          <span className={`card-status status-${l.order_status.toLowerCase()}`}>{l.order_status}</span>
+                        </div>
+                        <div className="card-date">{new Date(l.consultation_date).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}</div>
+                        {l.findings && (
+                          <div className="card-section">
+                            <span className="section-label">Findings</span>
+                            <p className="section-content">{l.findings}</p>
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )
+                )}
+              </div>
+
+              <div className="history-footer">
+                <p>Data retrieved using SQL JOIN queries across multiple tables</p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

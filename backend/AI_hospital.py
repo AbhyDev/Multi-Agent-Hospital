@@ -46,14 +46,30 @@ from tenacity import wait_exponential
 
 load_dotenv()
 
-llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash",
-    google_api_key=os.getenv("GEMINI_API_KEY"),
+# === GEMINI (5 req/min limit) ===
+# llm = ChatGoogleGenerativeAI(
+#     model="gemini-2.5-flash",
+#     google_api_key=os.getenv("GEMINI_API_KEY"),
+# )
+
+# llm_rag = ChatGoogleGenerativeAI(
+#     model="gemini-2.0-flash",
+#     google_api_key=os.getenv("GEMINI_API_KEY"),
+# )
+
+# === GROQ (30 req/min limit) ===
+# Using qwen3-32b for better tool calling support (recommended by Groq docs)
+# Other supported models: meta-llama/llama-4-scout-17b-16e-instruct, llama-3.1-8b-instant
+llm = ChatGroq(
+    model="qwen/qwen3-32b",
+    api_key=os.getenv("GROQ_API_KEY"),
+    temperature=0.7,
 )
 
-llm_rag = ChatGoogleGenerativeAI(
-    model="gemini-2.0-flash",
-    google_api_key=os.getenv("GEMINI_API_KEY"),
+llm_rag = ChatGroq(
+    model="qwen/qwen3-32b", 
+    api_key=os.getenv("GROQ_API_KEY"),
+    temperature=0.3,
 )
 
 print("LLM instances with retry logic configured successfully.")
@@ -223,8 +239,6 @@ def VectorRAG_Retrival(query:str, agent:str)->str:
     relevant_docs = retriever.invoke(query)
 
     Systemprompt = SystemMessage(content=f"""
-        response = pathllm.invoke([SystemPrompt] + state['patho_messages'])
-        return {'patho_messages': [response], 'current_agent': 'Pathologist'}
     <context>
     {relevant_docs}
     </context>
@@ -297,10 +311,24 @@ Begin by greeting the patient, then ask the first clarifying question using ask_
 
 
 
+def _get_content_str(message) -> str:
+    """Extract string content from a message, handling list format from new langchain versions."""
+    content = message.content
+    if isinstance(content, list):
+        # New langchain format: content is a list of dicts or strings
+        text_parts = []
+        for part in content:
+            if isinstance(part, str):
+                text_parts.append(part)
+            elif isinstance(part, dict) and 'text' in part:
+                text_parts.append(part['text'])
+        return ' '.join(text_parts)
+    return content if content else ''
+
 
 def router_gp(state: AgentState) -> AgentState:
     last_message = state['messages'][-1]
-    content = last_message.content.lower()
+    content = _get_content_str(last_message).lower()
     if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
         ask_user_called = any(tc.get('name') == 'ask_user' for tc in last_message.tool_calls)
         if ask_user_called:
@@ -383,7 +411,7 @@ Rules:
 def router_opthal(state: AgentState) -> AgentState:
     global final_report
     last_message = state['specialist_messages'][-1]
-    content = last_message.content.lower()
+    content = _get_content_str(last_message).lower()
 
     if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
         ask_user_called = any(tc.get('name') == 'ask_user' for tc in last_message.tool_calls)
@@ -399,12 +427,12 @@ def router_opthal(state: AgentState) -> AgentState:
     elif "pathologist" in content:
         state['next_agent'].append('Ophthalmologist')
         state["patho_QnA"].append("Question from Ophthalmologist to Pathologist: ")
-        state["patho_QnA"].append(last_message.content)
+        state["patho_QnA"].append(_get_content_str(last_message))
         return "Pathologist"
     elif "radiologist" in content:
         state['next_agent'].append('Ophthalmologist')
         state['radio_QnA'].append("Question from Ophthalmologist to Radiologist: ")
-        state['radio_QnA'].append(last_message.content)
+        state['radio_QnA'].append(_get_content_str(last_message))
         return "Radiologist"
     elif "final report:" in content:
         global final_report 
@@ -462,7 +490,7 @@ Rules:
 def router_pedia(state: AgentState) -> AgentState:
     global final_report
     last_message = state['specialist_messages'][-1]
-    content = last_message.content.lower()
+    content = _get_content_str(last_message).lower()
 
     if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
         ask_user_called = any(tc.get('name') == 'ask_user' for tc in last_message.tool_calls)
@@ -477,12 +505,12 @@ def router_pedia(state: AgentState) -> AgentState:
     elif "pathologist" in content:
         state['next_agent'].append('Pediatrician')
         state["patho_QnA"].append("Question from Pediatrician to Pathologist: ")
-        state["patho_QnA"].append(last_message.content)
+        state["patho_QnA"].append(_get_content_str(last_message))
         return "Pathologist"
     elif "radiologist" in content:
         state['next_agent'].append('Pediatrician')
         state['radio_QnA'].append("Question from Pediatrician to Radiologist: ")
-        state['radio_QnA'].append(last_message.content)
+        state['radio_QnA'].append(_get_content_str(last_message))
         return "Radiologist"
     elif "final report:" in content:
         global final_report 
@@ -540,7 +568,7 @@ Rules:
 def router_ortho(state: AgentState) -> AgentState:
     global final_report
     last_message = state['specialist_messages'][-1]
-    content = last_message.content.lower()
+    content = _get_content_str(last_message).lower()
 
     if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
         ask_user_called = any(tc.get('name') == 'ask_user' for tc in last_message.tool_calls)
@@ -555,12 +583,12 @@ def router_ortho(state: AgentState) -> AgentState:
     elif "pathologist" in content:
         state['next_agent'].append('Orthopedist')
         state["patho_QnA"].append("Question from Orthopedist to Pathologist: ")
-        state["patho_QnA"].append(last_message.content)
+        state["patho_QnA"].append(_get_content_str(last_message))
         return "Pathologist"
     elif "radiologist" in content:
         state['next_agent'].append('Orthopedist')
         state['radio_QnA'].append("Question from Orthopedist to Radiologist: ")
-        state['radio_QnA'].append(last_message.content)
+        state['radio_QnA'].append(_get_content_str(last_message))
         return "Radiologist"
     elif "final report:" in content:
         global final_report 
@@ -618,7 +646,7 @@ Rules:
 def router_dermat(state: AgentState) -> AgentState:
     global final_report
     last_message = state['specialist_messages'][-1]
-    content = last_message.content.lower()
+    content = _get_content_str(last_message).lower()
 
     if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
         ask_user_called = any(tc.get('name') == 'ask_user' for tc in last_message.tool_calls)
@@ -633,12 +661,12 @@ def router_dermat(state: AgentState) -> AgentState:
     elif "pathologist" in content:
         state['next_agent'].append('Dermatologist')
         state["patho_QnA"].append("Question from Dermatologist to Pathologist: ")
-        state["patho_QnA"].append(last_message.content)
+        state["patho_QnA"].append(_get_content_str(last_message))
         return "Pathologist"
     elif "radiologist" in content:
         state['next_agent'].append('Dermatologist')
         state['radio_QnA'].append("Question from Dermatologist to Radiologist: ")
-        state['radio_QnA'].append(last_message.content)
+        state['radio_QnA'].append(_get_content_str(last_message))
         return "Radiologist"
     elif "final report:" in content:
         global final_report 
@@ -696,7 +724,7 @@ Rules:
 def router_ent(state: AgentState) -> AgentState:
     global final_report
     last_message = state['specialist_messages'][-1]
-    content = last_message.content.lower()
+    content = _get_content_str(last_message).lower()
 
     if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
         ask_user_called = any(tc.get('name') == 'ask_user' for tc in last_message.tool_calls)
@@ -711,12 +739,12 @@ def router_ent(state: AgentState) -> AgentState:
     elif "pathologist" in content:
         state['next_agent'].append('ENT')
         state["patho_QnA"].append("Question from ENT to Pathologist: ")
-        state["patho_QnA"].append(last_message.content)
+        state["patho_QnA"].append(_get_content_str(last_message))
         return "Pathologist"
     elif "radiologist" in content:
         state['next_agent'].append('ENT')
         state['radio_QnA'].append("Question from ENT to Radiologist: ")
-        state['radio_QnA'].append(last_message.content)
+        state['radio_QnA'].append(_get_content_str(last_message))
         return "Radiologist"
     elif "final report:" in content:
         global final_report 
@@ -774,7 +802,7 @@ Rules:
 def router_gynec(state: AgentState) -> AgentState:
     global final_report
     last_message = state['specialist_messages'][-1]
-    content = last_message.content.lower()
+    content = _get_content_str(last_message).lower()
 
     if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
         ask_user_called = any(tc.get('name') == 'ask_user' for tc in last_message.tool_calls)
@@ -789,12 +817,12 @@ def router_gynec(state: AgentState) -> AgentState:
     elif "pathologist" in content:
         state['next_agent'].append('Gynecologist')
         state["patho_QnA"].append("Question from Gynecologist to Pathologist: ")
-        state["patho_QnA"].append(last_message.content)
+        state["patho_QnA"].append(_get_content_str(last_message))
         return "Pathologist"
     elif "radiologist" in content:
         state['next_agent'].append('Gynecologist')
         state['radio_QnA'].append("Question from Gynecologist to Radiologist: ")
-        state['radio_QnA'].append(last_message.content)
+        state['radio_QnA'].append(_get_content_str(last_message))
         return "Radiologist"
     elif "final report:" in content:
         global final_report 
@@ -852,7 +880,7 @@ Rules:
 def router_psych(state: AgentState) -> AgentState:
     global final_report
     last_message = state['specialist_messages'][-1]
-    content = last_message.content.lower()
+    content = _get_content_str(last_message).lower()
 
     if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
         ask_user_called = any(tc.get('name') == 'ask_user' for tc in last_message.tool_calls)
@@ -867,12 +895,12 @@ def router_psych(state: AgentState) -> AgentState:
     elif "pathologist" in content:
         state['next_agent'].append('Psychiatrist')
         state["patho_QnA"].append("Question from Psychiatrist to Pathologist: ")
-        state["patho_QnA"].append(last_message.content)
+        state["patho_QnA"].append(_get_content_str(last_message))
         return "Pathologist"
     elif "radiologist" in content:
         state['next_agent'].append('Psychiatrist')
         state['radio_QnA'].append("Question from Psychiatrist to Radiologist: ")
-        state['radio_QnA'].append(last_message.content)
+        state['radio_QnA'].append(_get_content_str(last_message))
         return "Radiologist"
     elif "final report:" in content:
         global final_report 
@@ -931,7 +959,7 @@ Rules:
 def router_medicine(state: AgentState) -> AgentState:
     global final_report
     last_message = state['specialist_messages'][-1]
-    content = last_message.content.lower()
+    content = _get_content_str(last_message).lower()
 
     if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
         ask_user_called = any(tc.get('name') == 'ask_user' for tc in last_message.tool_calls)
@@ -946,12 +974,12 @@ def router_medicine(state: AgentState) -> AgentState:
     elif "pathologist" in content:
         state['next_agent'].append('Internal Medicine')
         state["patho_QnA"].append("Question from Internal Medicine to Pathologist: ")
-        state["patho_QnA"].append(last_message.content)
+        state["patho_QnA"].append(_get_content_str(last_message))
         return "Pathologist"
     elif "radiologist" in content:
         state['next_agent'].append('Internal Medicine')
         state['radio_QnA'].append("Question from Internal Medicine to Radiologist: ")
-        state['radio_QnA'].append(last_message.content)
+        state['radio_QnA'].append(_get_content_str(last_message))
         return "Radiologist"
     elif "final report:" in content:
         global final_report 
@@ -1007,9 +1035,9 @@ def router_patho(state: AgentState) -> AgentState:
         if ask_user_called:
             return "Patho_AskUser"
         return "Patho_Tooler"
-    elif "final report" in last_message.content.lower() and "specialist" in last_message.content.lower():
+    elif "final report" in _get_content_str(last_message).lower() and "specialist" in _get_content_str(last_message).lower():
         state["patho_QnA"].append("Pathologist Answer report to specialist:")
-        state["patho_QnA"].append(last_message.content)
+        state["patho_QnA"].append(_get_content_str(last_message))
         if state.get('next_agent') and len(state['next_agent']) > 0:
             return state['next_agent'].pop()
         caller_map = {
@@ -1072,9 +1100,9 @@ def router_radio(state: AgentState) -> AgentState:
         if ask_user_called:
             return "Radio_AskUser"
         return "Radio_Tooler"
-    elif "final report" in last_message.content.lower() and "specialist" in last_message.content.lower():
+    elif "final report" in _get_content_str(last_message).lower() and "specialist" in _get_content_str(last_message).lower():
         state["radio_QnA"].append("Radiologist Answer report to specialist:")
-        state["radio_QnA"].append(last_message.content)
+        state["radio_QnA"].append(_get_content_str(last_message))
         if state.get('next_agent') and len(state['next_agent']) > 0:
             return state['next_agent'].pop()
         caller_map = {

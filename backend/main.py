@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from .api import router
 from .cors_config import add_cors_middleware
-from .routers import users, oauth
+from .routers import users, oauth, history
 from sqlalchemy.orm import Session
 from . import models, database
 
@@ -39,3 +39,4 @@ add_cors_middleware(app)
 app.include_router(users.router)
 app.include_router(oauth.router)
 app.include_router(router)
+app.include_router(history.router)

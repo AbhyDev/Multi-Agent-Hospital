@@ -1,10 +1,12 @@
 from fastapi import APIRouter, HTTPException, Depends, status
 from uuid import uuid4
 from typing import Optional, List
-from sqlalchemy.orm import Session 
+from sqlalchemy.orm import Session
+from datetime import datetime
 
 from .AI_hospital import myapp
-from . import database, models, oauth2 
+from . import database, models, oauth2
+from .mongo_client import get_conversation_logs
 from langchain_core.messages import HumanMessage, ToolMessage, AIMessage
 from sse_starlette.sse import EventSourceResponse
 import json
@@ -115,6 +117,47 @@ def _chunk_to_payload(chunk: dict) -> Optional[dict]:
         return {"current_agent": current_agent}
     return None
 
+
+def _save_conversation_to_mongo(thread_id: str, patient_id: int, state_values: dict):
+    """Save complete conversation log to MongoDB when consultation ends."""
+    try:
+        def serialize_messages(msgs):
+            """Convert LangChain messages to JSON-serializable format."""
+            if not msgs:
+                return []
+            return [
+                {
+                    "role": getattr(m, "type", "unknown"),
+                    "content": getattr(m, "content", ""),
+                }
+                for m in msgs
+            ]
+        
+        log_doc = {
+            "thread_id": thread_id,
+            "patient_id": patient_id,
+            "timestamp": datetime.utcnow(),
+            "messages": {
+                "gp": serialize_messages(state_values.get("messages")),
+                "specialist": serialize_messages(state_values.get("specialist_messages")),
+                "pathologist": serialize_messages(state_values.get("patho_messages")),
+                "radiologist": serialize_messages(state_values.get("radio_messages")),
+            },
+            "patho_QnA": state_values.get("patho_QnA", []),
+            "radio_QnA": state_values.get("radio_QnA", []),
+            "current_report": state_values.get("current_report", []),
+            "final_agent": state_values.get("current_agent"),
+        }
+        
+        collection = get_conversation_logs()
+        result = collection.insert_one(log_doc)
+        print(f"✅ MongoDB: Saved conversation {thread_id} (ID: {result.inserted_id})")
+        
+    except Exception as e:
+        # Don't break the flow if MongoDB fails
+        print(f"⚠️ MongoDB save failed: {e}")
+
+
 def _new_tool_calls(chunk: dict, seen_ids: set) -> list[dict]:
     """Extract newly issued tool calls from the stream chunk."""
     out: list[dict] = []
@@ -194,6 +237,8 @@ async def start_graph_stream(
             final_payload = {"thread_id": thread_id, "message": final}
             if current_agent:
                 final_payload["current_agent"] = current_agent
+            # Save complete conversation to MongoDB
+            _save_conversation_to_mongo(thread_id, patient_id, state_values)
             yield {"event": "final", "data": json.dumps(final_payload)}
 
     return EventSourceResponse(event_gen())
@@ -208,7 +253,8 @@ async def resume_graph_stream(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Invalid credentials",
     )
-    oauth2.verify_access_token(token, credentials_exception)
+    token_data = oauth2.verify_access_token(token, credentials_exception)
+    resume_patient_id = int(token_data.id)
     
     config = _make_config(thread_id)
     state = myapp.get_state(config)
@@ -255,6 +301,8 @@ async def resume_graph_stream(
             final_payload = {"thread_id": thread_id, "message": final}
             if current_agent:
                 final_payload["current_agent"] = current_agent
+            # Save complete conversation to MongoDB
+            _save_conversation_to_mongo(thread_id, resume_patient_id, state_values2)
             yield {"event": "final", "data": json.dumps(final_payload)}
 
     return EventSourceResponse(event_gen())

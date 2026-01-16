@@ -1,0 +1,143 @@
+
+1.	Introduction
+This project presents AI Hospital, a multi-agent medical consultation system with a hybrid database architecture. The core challenge addressed is managing both structured medical records (requiring ACID compliance) and unstructured AI conversation logs (requiring flexible schema) within a unified system. Our objective is to design a database-centric application where AI agents act as specialized workers interacting with a central hybrid data layer, ensuring data persistence, normalization up to Third Normal Form (3NF), and comprehensive audit trails for medical compliance.
+
+2.	Existing System
+Traditional medical chatbots operate as monolithic, stateless applications with significant limitations:
+•	Single-Agent Design: One AI model attempts to handle all medical domains, lacking specialized expertise.
+•	No Workflow Modeling: Cannot simulate realistic clinical workflows involving multiple healthcare professionals (GP → Specialist → Lab).
+•	In-Memory State: Consultation data exists only during the session; no persistence for historical analysis.
+•	Monolithic Storage: Either uses only SQL (poor for unstructured logs) or only NoSQL (poor for transactional integrity).
+
+3.	Proposed System
+The proposed system implements a "hybrid database" architecture with multi-agent AI:
+
+•	Multi-Agent Architecture: 11 specialized AI agents (1 GP, 8 Specialists, 2 Helpers) orchestrated via LangGraph state machine.
+•	Hybrid Data Model: PostgreSQL (RDBMS) + MongoDB (Document DB) + ChromaDB (Vector DB).
+•	Full Normalization: Relational schema satisfies Third Normal Form (3NF), eliminating redundancy and ensuring data integrity.
+•	RAG Integration: Domain-specific vector stores provide evidence-based medical knowledge to specialist agents.
+•	Real-Time Streaming: Server-Sent Events (SSE) enable live consultation responses.
+
+4.	Relational Database Structure (PostgreSQL)
+The relational database serves as the transactional backbone, managing all structured medical records with referential integrity.
+
+ENTITIES:
+
+PATIENT (patient_id PK, email UNIQUE, password, name, age, gender, created_at)
+  - Stores registered patient information
+  - Email has UNIQUE constraint for authentication
+
+DOCTOR (doctor_id PK, name, specialty)
+  - Registry of AI specialist agents
+  - Seeded with 9 practitioners at startup (1 GP + 8 Specialists)
+
+CONSULTATION (consultation_id PK, patient_id FK, status, started_at)
+  - Master table for diagnostic sessions
+  - Status values: Active, Completed, Abandoned
+
+LAB_ORDER (order_id PK, consultation_id FK, test_name, status)
+  - Diagnostic test requests by Pathologist/Radiologist agents
+  - Status: Pending or Complete
+
+LAB_RESULT (result_id PK, order_id FK, findings)
+  - Stores diagnostic findings from helper agents
+  - One-to-One relationship with Lab_Order
+
+MEDICAL_REPORT (report_id PK, consultation_id FK, diagnosis, treatment)
+  - Final consultation output with diagnosis and treatment plan
+  - One-to-One relationship with Consultation
+
+RELATIONSHIPS & CARDINALITIES:
+
+Patient 1──M Consultation (One-to-Many)
+  - One Patient can have MANY Consultations
+  - Every Consultation must belong to exactly ONE Patient (Total Participation)
+  - FK: patient_id in Consultation references Patient
+  - ON DELETE CASCADE: Deleting a patient removes all their consultations
+
+Consultation 1──M Lab_Order (One-to-Many)
+  - One Consultation can have MANY Lab_Orders (multiple tests per visit)
+  - Every Lab_Order must belong to exactly ONE Consultation (Total Participation)
+  - FK: consultation_id in Lab_Order references Consultation
+  - ON DELETE CASCADE
+
+Lab_Order 1──1 Lab_Result (One-to-One)
+  - One Lab_Order has exactly ONE Lab_Result
+  - Every Lab_Result must have exactly ONE Lab_Order (Total Participation)
+  - FK: order_id in Lab_Result references Lab_Order
+  - ON DELETE CASCADE
+
+Consultation 1──1 Medical_Report (One-to-One)
+  - One Consultation generates exactly ONE Medical_Report (when completed)
+  - Every Medical_Report must belong to exactly ONE Consultation (Total Participation)
+  - FK: consultation_id in Medical_Report references Consultation
+  - ON DELETE CASCADE
+
+NORMALIZATION ANALYSIS:
+
+First Normal Form (1NF): ✓
+  - All attributes contain atomic (indivisible) values
+  - No repeating groups or arrays
+  - Each table has a defined primary key
+
+Second Normal Form (2NF): ✓
+  - Schema is in 1NF
+  - All non-key attributes fully depend on the entire primary key
+  - Single-column primary keys eliminate partial dependencies
+
+Third Normal Form (3NF): ✓
+  - Schema is in 2NF
+  - No transitive dependencies (non-key → non-key)
+  - Example: In Patient, name/age/gender depend ONLY on patient_id, not on each other
+
+5.	RDBMS AND NoSQL Integration
+The hybrid architecture separates concerns, allowing each database type to handle its optimal workload:
+
+PostgreSQL (RDBMS):
+  - Manages structured, transactional medical records
+  - Provides ACID compliance for data integrity
+  - Supports complex JOIN queries across entities
+  - Handles authentication and referential constraints
+
+MongoDB (Document DB):
+  - Stores unstructured conversation logs from AI agents
+  - Captures complete AgentState after consultation completion
+  - Flexible schema accommodates varying message structures
+  - Enables historical analysis and model improvement
+
+ChromaDB (Vector DB):
+  - Stores medical knowledge embeddings for RAG
+  - Uses BAAI/bge-large-en-v1.5 embedding model
+  - 9 specialty-specific collections (Ophthalmology, Dermatology, etc.)
+  - Enables semantic similarity search for evidence-based responses
+
+SQL JOIN QUERY EXAMPLES:
+The /history API demonstrates practical JOIN operations:
+
+LEFT JOIN (Consultations with Reports):
+  SELECT c.consultation_id, c.status, mr.diagnosis, mr.treatment
+  FROM consultations c
+  LEFT JOIN medical_reports mr ON c.consultation_id = mr.consultation_id
+  WHERE c.patient_id = ?
+
+Multi-Table JOIN (Complete History - 4 Tables):
+  SELECT c.*, mr.diagnosis, lo.test_name, lr.findings
+  FROM consultations c
+  LEFT JOIN medical_reports mr ON c.consultation_id = mr.consultation_id
+  LEFT JOIN lab_orders lo ON c.consultation_id = lo.consultation_id
+  LEFT JOIN lab_results lr ON lo.order_id = lr.order_id
+  WHERE c.patient_id = ?
+
+6.	Societal Concern
+This project addresses critical societal concerns in healthcare accessibility:
+•	Medical Access: AI-powered consultations can extend specialist expertise to underserved regions.
+•	Data Integrity: Normalized database design with referential integrity ensures reliable medical records.
+•	Auditability: MongoDB logs provide complete consultation transcripts for regulatory compliance.
+•	Privacy: JWT authentication and password hashing protect patient data.
+
+Recent Technological Trends Used:
+•	Multi-Agent AI: LangGraph-orchestrated specialist agents with conditional routing
+•	Retrieval-Augmented Generation (RAG): Vector DB integration for grounded medical responses
+•	Hybrid Database Architecture: Polyglot persistence combining SQL, Document, and Vector databases
+•	Real-Time Streaming: SSE for responsive consultation experiences
+•	Full-Stack Development: React + FastAPI + PostgreSQL modern stack

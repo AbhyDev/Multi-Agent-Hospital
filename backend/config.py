@@ -14,6 +14,8 @@ class Settings(BaseSettings):
 
     gemini_api_key: str | None = None
     tavily_api_key: str | None = None
+    groq_api_key: str | None = None
+    mongodb_uri: str = "mongodb://localhost:27017/ai_hospital"
 
     model_config = SettingsConfigDict(
         env_file=".env",
