@@ -122,8 +122,9 @@ AI Hospital is a sophisticated healthcare simulation platform that replicates a 
 | **LangChain** | LLM integrations and tool definitions |
 | **ChromaDB** | Vector database for RAG embeddings |
 | **HuggingFace** | BGE embedding model for semantic search |
-| **Google Gemini** | Primary LLM (gemini-2.5-flash / gemini-2.0-flash) |
+| **Groq API** | Primary LLM (qwen/qwen3-32b) for agent reasoning and RAG |
 | **Tavily** | Web search API for supplementary information |
+| **MongoDB** | NoSQL database for conversation logs and audit trails |
 
 ### Frontend
 | Technology | Purpose |
@@ -320,8 +321,10 @@ SECRET_KEY=your_jwt_secret_key
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=60
 
-GEMINI_API_KEY=your_gemini_key
+GROQ_API_KEY=your_groq_key
+GEMINI_API_KEY=your_gemini_key    # Optional, for fallback
 TAVILY_API_KEY=your_tavily_key
+MONGO_URI=mongodb://localhost:27017
 ```
 
 ### Installation
@@ -359,12 +362,19 @@ AI-Hospital/
 │   ├── schemas.py           # Pydantic request/response models
 │   ├── oauth2.py            # JWT token utilities
 │   ├── config.py            # Pydantic settings from .env
+│   ├── mongo_client.py      # MongoDB connection for conversation logs
+│   ├── cors_config.py       # CORS middleware configuration
+│   ├── utils.py             # Utility functions
 │   ├── routers/
 │   │   ├── users.py         # Patient registration
-│   │   └── oauth.py         # Login endpoint
+│   │   ├── oauth.py         # Login endpoint
+│   │   └── history.py       # Patient history with SQL JOINs
+│   ├── custom_libs/
+│   │   └── Audioconvert.py  # Text-to-speech and speech-to-text
 │   ├── Knowledge_notebooks/
 │   │   ├── initialize_rag.py    # Vector store loader
 │   │   └── vector_rag.ipynb     # RAG creation notebook
+│   ├── Knowledge Base/      # Source medical documents
 │   └── vector_stores/       # Pre-built ChromaDB stores
 │
 └── frontend/
