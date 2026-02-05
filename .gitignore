@@ -27,7 +27,7 @@ coverage.xml
 # .env
 
 # Project-specific ignores
-backend/custom_libs/
+# backend/custom_libs/  # REMOVED: Now tracked in git
 backend/OS_downloads.txt
 
 # Node.js (frontend)
@@ -69,7 +69,7 @@ Thumbs.db
 
 # Vector stores (large files, regenerate as needed)
 backend/vector_stores/
-backend/Knowledge Base
+# backend/Knowledge Base  # REMOVED: Now tracked in git (442MB PDFs)
 
 # Logs
 logs/
