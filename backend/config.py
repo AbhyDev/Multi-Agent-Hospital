@@ -1,5 +1,8 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pathlib import Path
 
+# Get the directory where this config.py file is located
+_ENV_FILE = Path(__file__).parent / ".env"
 
 class Settings(BaseSettings):
     database_hostname: str = "localhost"
@@ -18,7 +21,7 @@ class Settings(BaseSettings):
     mongodb_uri: str = "mongodb://localhost:27017/ai_hospital"
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=str(_ENV_FILE),
         env_file_encoding="utf-8",
         extra="forbid"
     )

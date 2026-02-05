@@ -43,8 +43,10 @@ import os
 from dotenv import load_dotenv
 from google.api_core.exceptions import ResourceExhausted
 from tenacity import wait_exponential
+from pathlib import Path
 
-load_dotenv()
+# Load .env from the backend directory (same directory as this file)
+load_dotenv(Path(__file__).parent / ".env")
 
 # === GEMINI (5 req/min limit) ===
 # llm = ChatGoogleGenerativeAI(
