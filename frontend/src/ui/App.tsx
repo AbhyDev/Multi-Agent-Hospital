@@ -93,9 +93,11 @@ const formatTime = (date: Date) => {
 }
 
 const BACKEND = import.meta.env.VITE_API_BASE || ''
-const LOGIN_URL = 'http://localhost:8000/login'
-const SIGNUP_URL = 'http://localhost:8000/users/'
-const HISTORY_BASE = 'http://localhost:8000/history'
+const DEV_API_BASE = 'http://localhost:8000'
+
+const LOGIN_URL = `${BACKEND || DEV_API_BASE}/login`
+const SIGNUP_URL = `${BACKEND || DEV_API_BASE}/users/`
+const HISTORY_BASE = `${BACKEND || DEV_API_BASE}/history`
 const TOKEN_STORAGE_KEY = 'access_token'
 
 export default function App() {
