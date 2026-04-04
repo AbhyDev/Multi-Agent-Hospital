@@ -7,6 +7,7 @@ def add_cors_middleware(app):
             "http://localhost:3000",
             "http://localhost:5173",
             "https://multi-agent-hospital.vercel.app",
+            "https://agentic-hospital.abhyudaysharma.dev",
         ],
         allow_credentials=True,
         allow_methods=["*"],
