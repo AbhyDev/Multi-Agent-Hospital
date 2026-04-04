@@ -17,14 +17,15 @@ body { margin: 0; background: #0b1324; color: var(--text); font-family: ui-sans-
 .app-root {
   position: relative;
   width: 100%;
-  height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
   padding: 14px clamp(16px, 4vw, 42px) 14px;
+  padding-bottom: env(safe-area-inset-bottom, 14px);
   box-sizing: border-box;
-  overflow: hidden; /* lock page scroll; internal panels scroll instead */
+  overflow: hidden;
 }
 
 /* Cursor-driven glow */
@@ -348,7 +349,7 @@ body { margin: 0; background: #0b1324; color: var(--text); font-family: ui-sans-
 }
 
 @media (max-width: 900px) {
-  .app-root { padding: 10px clamp(10px, 5vw, 26px); height: 100vh; }
+  .app-root { padding: 10px clamp(10px, 5vw, 26px); height: 100dvh; padding-bottom: max(10px, env(safe-area-inset-bottom)); }        
   .main-row { flex-direction: column; }
   .tool-panel { flex-direction: row; width: auto; flex: 0 0 auto; overflow-x: auto; overflow-y: hidden; max-height: 140px; }
   .tool-list { flex-direction: row; overflow-x: auto; overflow-y: hidden; }
