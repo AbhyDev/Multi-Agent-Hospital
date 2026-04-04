@@ -35,4 +35,5 @@ dependencies = [
     "unstructured[pdf]>=0.18.27",
     "chromadb>=1.1.0",
     "transformers>=4.57.5",
+    "gdown>=5.2.1",
 ]
