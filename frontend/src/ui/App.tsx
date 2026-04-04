@@ -298,7 +298,7 @@ export default function App() {
       setAuthError('Please log in to start a consultation.')
       return
     }
-    const url = `${BACKEND}/api/graph/start/stream?message=${encodeURIComponent(userText)}&token=${encodeURIComponent(activeToken)}`
+    const url = `${BACKEND || DEV_API_BASE}/graph/start/stream?message=${encodeURIComponent(userText)}&token=${encodeURIComponent(activeToken)}`
     const es = new EventSource(url)
     setIsTyping(true)
 
@@ -361,7 +361,7 @@ export default function App() {
       setAuthError('Session expired. Please log in again.')
       return
     }
-    const url = `${BACKEND}/api/graph/resume/stream?thread_id=${encodeURIComponent(tid)}&user_reply=${encodeURIComponent(reply)}&token=${encodeURIComponent(activeToken)}`
+    const url = `${BACKEND || DEV_API_BASE}/graph/resume/stream?thread_id=${encodeURIComponent(tid)}&user_reply=${encodeURIComponent(reply)}&token=${encodeURIComponent(activeToken)}`
     const es = new EventSource(url)
     setPendingAsk(null)
     setChat((c) => [...c, { role: 'user', content: reply, timestamp: new Date() }])
