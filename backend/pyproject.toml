@@ -36,4 +36,5 @@ dependencies = [
     "chromadb>=1.1.0",
     "transformers>=4.57.5",
     "gdown>=5.2.1",
+    "gunicorn>=25.3.0",
 ]
