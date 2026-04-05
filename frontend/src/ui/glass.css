@@ -542,6 +542,19 @@ body { margin: 0; background: #0b1324; color: var(--text); font-family: ui-sans-
   gap: 12px;
 }
 
+.github-link {
+  color: rgba(255, 255, 255, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+.github-link:hover {
+  color: #fff;
+  transform: scale(1.1);
+  filter: drop-shadow(0 0 8px rgba(255,255,255,0.4));
+}
+
 .logout-btn {
   background: rgba(255, 123, 158, 0.2);
   color: var(--danger);

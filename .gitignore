@@ -79,4 +79,5 @@ logs/
 *.tmp
 *.temp
 
+.env.github/
 .env

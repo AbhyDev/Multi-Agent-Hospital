@@ -2,6 +2,8 @@
 
 > **A full-stack AI-powered virtual hospital** that simulates realistic medical consultations through intelligent agent orchestration, RAG-enhanced diagnostics, and persistent patient records.
 
+**🌐 Live Demo:** [agentic-hospital.abhyudaysharma.dev](https://agentic-hospital.abhyudaysharma.dev)
+
 ![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white)
