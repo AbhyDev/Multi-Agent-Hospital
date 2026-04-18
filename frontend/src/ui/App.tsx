@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { SpeedInsights } from '@vercel/speed-insights/react'
+import { Analytics } from '@vercel/analytics/react'
 import './glass.css'
 
 type ChatItem = {
@@ -783,6 +784,7 @@ export default function App() {
         )}
       </div>
       <SpeedInsights />
+      <Analytics />
     </div>
   )
 }
