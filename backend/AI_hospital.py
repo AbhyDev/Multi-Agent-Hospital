@@ -63,13 +63,13 @@ load_dotenv(Path(__file__).parent / ".env")
 # Using qwen3-32b for better tool calling support (recommended by Groq docs)
 # Other supported models: meta-llama/llama-4-scout-17b-16e-instruct, llama-3.1-8b-instant
 llm = ChatGroq(
-    model="qwen/qwen3-32b",
+    model="qwen/qwen3.6-27b",
     api_key=os.getenv("GROQ_API_KEY"),
     temperature=0.7,
 )
 
 llm_rag = ChatGroq(
-    model="qwen/qwen3-32b", 
+    model="qwen/qwen3.6-27b", 
     api_key=os.getenv("GROQ_API_KEY"),
     temperature=0.3,
 )
