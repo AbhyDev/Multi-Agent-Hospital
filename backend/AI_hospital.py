@@ -358,8 +358,13 @@ def router_gp(state: AgentState) -> AgentState:
         state['next_agent'].append('Internal Medicine')
         return "internal medicine"
     elif "ent" in content:
-        state['next_agent'].append('ENT')
-        return "ent"
+        # Prevent "ent" from matching inside other words like "center"
+        import re
+        if re.search(r'\bent\b', content):
+            state['next_agent'].append('ENT')
+            return "ent"
+        else:
+            return "GP"
     else:
         return "GP"
 
